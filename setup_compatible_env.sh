@@ -12,8 +12,60 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# Parse command line arguments
+DEMUCS_VERSION=4
+INSTALL_SPLEETER=false
+INSTALL_BANDSPLIT_RNN=false
+INSTALL_D3NET=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --demucs-v3)
+            DEMUCS_VERSION=3
+            shift
+            ;;
+        --spleeter)
+            INSTALL_SPLEETER=true
+            shift
+            ;;
+        --bandsplit-rnn)
+            INSTALL_BANDSPLIT_RNN=true
+            shift
+            ;;
+        --d3net)
+            INSTALL_D3NET=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Valid options:"
+            echo "  --demucs-v3      Install Demucs v3 instead of v4"
+            echo "  --spleeter       Install Spleeter models"
+            echo "  --bandsplit-rnn  Install Band-Split RNN models"
+            echo "  --d3net          Install D3Net models"
+            exit 1
+            ;;
+    esac
+done
+
 echo -e "${GREEN}=== CaptainStems Compatible Environment Setup ===${NC}"
 echo "This script will create a Python 3.10 virtual environment for CaptainStems."
+if [ "$DEMUCS_VERSION" -eq 3 ]; then
+    echo "Demucs v3 will be installed."
+else
+    echo "Demucs v4 will be installed (default)."
+fi
+
+if [ "$INSTALL_SPLEETER" = true ]; then
+    echo "Spleeter will also be installed."
+fi
+
+if [ "$INSTALL_BANDSPLIT_RNN" = true ]; then
+    echo "Band-Split RNN will also be installed."
+fi
+
+if [ "$INSTALL_D3NET" = true ]; then
+    echo "D3Net will also be installed."
+fi
 
 # Check for ffmpeg
 check_ffmpeg() {
@@ -144,7 +196,7 @@ echo "Updating pip..."
 pip install --upgrade pip setuptools wheel
 
 # First install numpy 1.x specifically to prevent version conflicts
-echo "Installing NumPy 1.x (required for PyTorch compatibility)..."
+echo "Installing NumPy 1.x (required for PyTorch/TensorFlow compatibility)..."
 pip install "numpy>=1.24.0,<2.0.0"
 
 # Install basic requirements
@@ -166,8 +218,46 @@ else
 fi
 
 # Install Demucs with explicit version
-echo "Installing Demucs..."
-pip install demucs==4.0.1
+if [ "$DEMUCS_VERSION" -eq 3 ]; then
+    echo "Installing Demucs v3..."
+    pip install demucs==3.0.6
+else
+    echo "Installing Demucs v4..."
+    pip install demucs==4.0.1
+fi
+
+# Install Spleeter if requested
+if [ "$INSTALL_SPLEETER" = true ]; then
+    echo "Installing TensorFlow and Spleeter..."
+    pip install tensorflow==2.12.0 --no-deps
+    pip install tensorflow==2.12.0
+    pip install spleeter==2.4.0
+fi
+
+# Install Band-Split RNN if requested
+if [ "$INSTALL_BANDSPLIT_RNN" = true ]; then
+    echo "Installing Band-Split RNN..."
+    pip install ffmpeg-python
+    pip install band-split-rnn
+fi
+
+# Install D3Net if requested
+if [ "$INSTALL_D3NET" = true ]; then
+    echo "Installing D3Net dependencies..."
+    pip install audiofile ffmpeg-python
+    
+    echo "Installing D3Net from source..."
+    # Create temporary directory for cloning
+    TMP_DIR=$(mktemp -d)
+    git clone https://github.com/sony/ai-research-code.git "$TMP_DIR"
+    D3NET_DIR="$TMP_DIR/d3net"
+    if [ -d "$D3NET_DIR" ]; then
+        pip install -e "$D3NET_DIR"
+        echo "D3Net installed successfully."
+    else
+        echo "D3Net installation failed: directory not found."
+    fi
+fi
 
 # Create start script
 echo "Creating startup script..."
@@ -196,6 +286,45 @@ echo ""
 echo "Or manually:"
 echo "  source venv_py310/bin/activate"
 echo "  python run.py"
+
+# Show information about installed models
+echo ""
+
+if [ "$DEMUCS_VERSION" -eq 3 ]; then
+    echo "Demucs v3 was installed with these available models:"
+    echo "  - demucs: Original Demucs v3 model"
+    echo "  - demucs_extra: Demucs v3 with extra training"
+    echo "  - demucs_quantized: Smaller Demucs v3 model"
+    echo "  - tasnet: Conv-TasNet model"
+    echo "  - tasnet_extra: Conv-TasNet with extra training"
+else
+    echo "Demucs v4 was installed with these available models:"
+    echo "  - htdemucs: Hybrid Transformer Demucs (default)"
+    echo "  - htdemucs_ft: Hybrid Transformer Demucs fine-tuned"
+    echo "  - htdemucs_6s: Hybrid Transformer Demucs for 6 sources separation"
+fi
+
+if [ "$INSTALL_SPLEETER" = true ]; then
+    echo ""
+    echo "Spleeter was installed with these available models:"
+    echo "  - 2stems: Vocals and accompaniment separation"
+    echo "  - 4stems: Vocals, drums, bass, and other separation"
+    echo "  - 5stems: Vocals, drums, bass, piano, and other separation"
+fi
+
+if [ "$INSTALL_BANDSPLIT_RNN" = true ]; then
+    echo ""
+    echo "Band-Split RNN was installed with these available models:"
+    echo "  - standard: Standard 4-source separation (vocals, drums, bass, other)"
+    echo "  - light: Lightweight 4-source separation (smaller model)"
+fi
+
+if [ "$INSTALL_D3NET" = true ]; then
+    echo ""
+    echo "D3Net was installed with these available models:"
+    echo "  - standard: Standard D3Net model (vocals, drums, bass, other)"
+    echo "  - optimized: Optimized version with better performance"
+fi
 
 # Deactivate virtual environment
 deactivate 

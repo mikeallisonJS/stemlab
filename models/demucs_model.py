@@ -9,18 +9,59 @@ from typing import Callable, Optional
 
 class DemucsModel:
     """
-    Wrapper for Demucs v4 model from Facebook Research.
+    Wrapper for Demucs models from Facebook Research.
     https://github.com/facebookresearch/demucs
     """
     
     # Formats explicitly supported by Demucs
     SUPPORTED_FORMATS = ['.mp3', '.wav', '.flac', '.ogg']
     
-    def __init__(self):
-        self.name = "Demucs v4"
+    # Available Demucs models
+    AVAILABLE_MODELS = {
+        # Demucs v3 models
+        "demucs": "Original Demucs v3 model",
+        "demucs_extra": "Demucs v3 with extra training",
+        "demucs_quantized": "Smaller Demucs v3 model",
+        "tasnet": "Conv-TasNet model",
+        "tasnet_extra": "Conv-TasNet with extra training",
+        
+        # Demucs v4 models
+        "htdemucs": "Hybrid Transformer Demucs v4 (default)",
+        "htdemucs_ft": "Hybrid Transformer Demucs v4 fine-tuned",
+        "htdemucs_6s": "Hybrid Transformer Demucs v4 for 6 sources separation"
+    }
+    
+    # Default separation stems for different model types
+    SEPARATION_MODES = {
+        "v3": ["drums", "bass", "other", "vocals"],
+        "v4_standard": ["drums", "bass", "other", "vocals"],
+        "v4_6stem": ["drums", "bass", "other", "vocals", "piano", "guitar"]
+    }
+    
+    def __init__(self, model_name="htdemucs"):
+        """
+        Initialize Demucs model wrapper.
+        
+        Args:
+            model_name: Name of the Demucs model to use
+        """
+        self.name = f"Demucs ({model_name})"
+        self.model_name = model_name
         self.available = self.check_dependencies()
         self.device = "cpu"  # Default to CPU
         
+        # Determine if this is a v3 or v4 model
+        self.is_v3 = model_name in ["demucs", "demucs_extra", "demucs_quantized", "tasnet", "tasnet_extra"]
+        self.is_6stem = model_name == "htdemucs_6s"
+        
+        # Set separation mode based on model type
+        if self.is_v3:
+            self.separation_mode = "v3"
+        elif self.is_6stem:
+            self.separation_mode = "v4_6stem"
+        else:
+            self.separation_mode = "v4_standard"
+            
         # Try to use CUDA if available
         try:
             import torch
@@ -60,7 +101,13 @@ class DemucsModel:
             print("Installing PyTorch dependencies...")
             subprocess.check_call([
                 sys.executable, "-m", "pip", "install", 
-                "torch", "torchaudio", 
+                "torch==2.0.1", "torchaudio==2.0.2", "--no-deps", 
+                "--index-url", "https://download.pytorch.org/whl/cpu"
+            ])
+            
+            subprocess.check_call([
+                sys.executable, "-m", "pip", "install", 
+                "torch==2.0.1", "torchaudio==2.0.2", 
                 "--index-url", "https://download.pytorch.org/whl/cpu"
             ])
             
@@ -68,7 +115,7 @@ class DemucsModel:
             print("Installing Demucs...")
             subprocess.check_call([
                 sys.executable, "-m", "pip", "install", 
-                "demucs"
+                "demucs==4.0.1"
             ])
             
             # Also install ffmpeg-python for format conversion
@@ -86,8 +133,8 @@ class DemucsModel:
         except Exception as e:
             print(f"Error installing Demucs: {e}")
             print("\nAlternative installation options:")
-            print("1. Install manually with: pip install torch torchaudio demucs ffmpeg-python")
-            print("2. Try installing with conda: conda install -c conda-forge demucs ffmpeg-python")
+            print("1. Install manually with: pip install torch==2.0.1 torchaudio==2.0.2 demucs==4.0.1 ffmpeg-python")
+            print("2. Try installing with conda: conda install -c conda-forge demucs=4.0.1")
             print("3. Visit https://github.com/facebookresearch/demucs for installation instructions")
             return False
     
@@ -143,10 +190,45 @@ class DemucsModel:
             print(f"Error during conversion: {e}")
             return input_file
     
+    @classmethod
+    def get_available_models(cls):
+        """
+        Get a dictionary of available Demucs models.
+        
+        Returns:
+            dict: Model name -> description
+        """
+        return cls.AVAILABLE_MODELS
+    
+    def get_model_cmd_args(self, two_stems=False):
+        """
+        Get the command-line arguments for the selected model.
+        
+        Args:
+            two_stems: Whether to separate into just vocals and instrumental
+            
+        Returns:
+            list: Command-line arguments for Demucs
+        """
+        cmd_args = []
+        
+        # Add model name argument
+        if self.is_v3:
+            cmd_args.extend(["-n", self.model_name])
+        else:
+            cmd_args.extend(["-n", self.model_name])
+            
+        # Add two-stems option if requested (only for v4)
+        if two_stems and not self.is_v3:
+            cmd_args.append("--two-stems=vocals")
+        
+        return cmd_args
+    
     def process(
         self, 
         input_file: str, 
         output_dir: str, 
+        two_stems: bool = False,
         progress_callback: Optional[Callable[[int], None]] = None
     ) -> str:
         """
@@ -155,6 +237,8 @@ class DemucsModel:
         Args:
             input_file: Path to audio file
             output_dir: Directory to save separated stems
+            two_stems: Whether to separate into just vocals and instrumental 
+                      (only for v4 models)
             progress_callback: Function to call with progress updates (0-100)
             
         Returns:
@@ -168,11 +252,16 @@ class DemucsModel:
                 raise ImportError(
                     "Demucs is not installed and could not be installed automatically.\n"
                     "Please install it manually with one of these methods:\n"
-                    "- pip install torch torchaudio demucs\n"
-                    "- conda install -c conda-forge demucs"
+                    "- pip install \"numpy>=1.24.0,<2.0.0\" torch==2.0.1 torchaudio==2.0.2 demucs==4.0.1\n"
+                    "- conda install -c conda-forge demucs=4.0.1"
                 )
             self.available = True
         
+        # Validate two_stems option (only for v4 models)
+        if two_stems and self.is_v3:
+            print("Warning: two_stems option is only supported for v4 models. Ignoring.")
+            two_stems = False
+            
         # Create temporary directory for processing
         with tempfile.TemporaryDirectory() as temp_dir:
             # Convert audio if needed
@@ -186,13 +275,15 @@ class DemucsModel:
             if progress_callback:
                 progress_callback(10)
                 
+            # Get model-specific command arguments
+            model_args = self.get_model_cmd_args(two_stems)
+                
             # Prepare command
             # We're using subprocess to call the demucs command line tool
             # This gives us better compatibility than using the Python API directly
             cmd = [
-                sys.executable, "-m", "demucs.separate", 
-                "-n", "htdemucs",  # Default Demucs v4 model
-                "--two-stems=vocals",  # Separate vocals and instrumental
+                sys.executable, "-m", "demucs.separate",
+            ] + model_args + [
                 "-d", self.device,
                 "--mp3",  # Output as MP3
                 "-o", temp_dir,
@@ -246,7 +337,11 @@ class DemucsModel:
                 raise Exception(f"Demucs processing failed with return code {process.returncode}\n\nOutput:\n{error_output}")
             
             # Get output directory (Demucs creates a subdirectory with model name)
-            model_dir = os.path.join(temp_dir, "htdemucs")
+            # V3 and V4 have slightly different output directory structures
+            if self.is_v3:
+                model_dir = os.path.join(temp_dir, self.model_name)
+            else:
+                model_dir = os.path.join(temp_dir, self.model_name.replace("_", "/"))
             
             # Get the track name (directory for this specific track)
             if not os.path.isdir(model_dir):
@@ -260,7 +355,7 @@ class DemucsModel:
             
             # Create output directory
             track_name = os.path.splitext(os.path.basename(input_file))[0]
-            final_output_dir = os.path.join(output_dir, f"{track_name}_stems")
+            final_output_dir = os.path.join(output_dir, f"{track_name}_{self.model_name}_stems")
             os.makedirs(final_output_dir, exist_ok=True)
             
             # Copy stems to output directory

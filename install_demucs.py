@@ -123,12 +123,20 @@ def install_pytorch(cpu_only=True, platform_specific=True):
     print("PyTorch installation completed.")
     return True
 
-def install_demucs():
+def install_demucs(version=4):
     """Install Demucs."""
-    print("Installing Demucs...")
+    print(f"Installing Demucs v{version}...")
+    
+    # Determine the version to install
+    if version == 3:
+        demucs_version = "demucs==3.0.6"
+        # Demucs v3 requires torch 1.8.1 and torchaudio 0.8.1, but we'll use 2.0.1 for compatibility
+        # It should still work with the newer torch
+    else:
+        demucs_version = "demucs==4.0.1"
     
     result = subprocess.run(
-        [sys.executable, "-m", "pip", "install", "demucs==4.0.1"],
+        [sys.executable, "-m", "pip", "install", demucs_version],
         capture_output=True, text=True
     )
     
@@ -136,7 +144,7 @@ def install_demucs():
         print(f"Error installing Demucs: {result.stderr}")
         return False
     
-    print("Demucs installation completed.")
+    print(f"Demucs v{version} installation completed.")
     return True
 
 def verify_installation():
@@ -177,7 +185,10 @@ def print_troubleshooting():
     print("   pip install \"numpy>=1.24.0,<2.0.0\"")
     print("   pip install torch==2.0.1 torchaudio==2.0.2")
     
-    print("\n4. Visit the official documentation:")
+    print("\n4. For Demucs v3 specific support:")
+    print("   You can install v3 with: pip install demucs==3.0.6")
+    
+    print("\n5. Visit the official documentation:")
     print("   PyTorch: https://pytorch.org/get-started/locally/")
     print("   Demucs: https://github.com/facebookresearch/demucs")
 
@@ -187,9 +198,11 @@ def main():
     parser.add_argument("--cpu-only", action="store_true", help="Install CPU-only version of PyTorch")
     parser.add_argument("--skip-platform-specific", action="store_true", 
                         help="Skip platform-specific installations (e.g., for M1/M2 Macs)")
+    parser.add_argument("--version", type=int, choices=[3, 4], default=4,
+                        help="Demucs version to install (3 or 4, default: 4)")
     args = parser.parse_args()
     
-    print_section("Demucs Installer for CaptainStems")
+    print_section(f"Demucs v{args.version} Installer for CaptainStems")
     
     # Check Python version
     check_python_version()
@@ -233,7 +246,7 @@ def main():
     
     # Install Demucs if needed
     if not installed['demucs']:
-        if not install_demucs():
+        if not install_demucs(version=args.version):
             print("Demucs installation failed.")
             print_troubleshooting()
             return
@@ -241,6 +254,10 @@ def main():
     # Verify installation
     if verify_installation():
         print("\nYou can now run CaptainStems with full functionality!")
+        if args.version == 3:
+            print("\nDemucs v3 models available: demucs, demucs_extra, demucs_quantized, tasnet, tasnet_extra")
+        else:
+            print("\nDemucs v4 models available: htdemucs, htdemucs_ft, htdemucs_6s")
     else:
         print_troubleshooting()
 

@@ -5,7 +5,7 @@ A cross-platform Python GUI application for audio source separation using AI mod
 ## Features
 
 - Drag and drop interface for audio files
-- Support for multiple AI models (currently Demucs v4)
+- Support for multiple AI models (Demucs v3/v4, Spleeter, Band-Split RNN, and D3Net)
 - Save separated audio stems to your local machine
 - Support for a wide range of audio formats (MP3, WAV, FLAC, OGG, M4A, AAC, AIFF, WMA, etc.)
 
@@ -13,7 +13,7 @@ A cross-platform Python GUI application for audio source separation using AI mod
 
 ### Option 1: Recommended - Use Python 3.10 (Most Compatible)
 
-Demucs and PyTorch work best with Python 3.10. Use our setup script to create a compatible environment:
+Demucs, Spleeter, and their dependencies work best with Python 3.10. Use our setup script to create a compatible environment:
 
 ```bash
 ./setup_compatible_env.sh
@@ -38,25 +38,58 @@ This script will:
 
 3. Install optional AI model dependencies:
 
-   **Option A: Use the dedicated installer script**
+   **Option A: Use the dedicated installer scripts**
 
    ```
+   # For Demucs v4 (default)
    python install_demucs.py
+
+   # For Demucs v3
+   python install_demucs.py --version 3
+
+   # For Spleeter
+   python install_spleeter.py
+
+   # For Band-Split RNN
+   python install_bandsplit.py
+
+   # For D3Net
+   python install_d3net.py
    ```
 
-   This script provides a guided installation process with platform-specific options.
+   These scripts provide a guided installation process with platform-specific options.
 
    **Option B: Manual installation**
 
    ```
-   pip install "numpy>=1.24.0,<2.0.0"  # Important: Install NumPy 1.x first
+   # First install NumPy 1.x (important for compatibility)
+   pip install "numpy>=1.24.0,<2.0.0"
+
+   # For Demucs models:
+   # Then install PyTorch and torchaudio
    pip install torch==2.0.1 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cpu
+   # Then install Demucs (v4 or v3)
    pip install demucs==4.0.1 ffmpeg-python
+   # Or for Demucs v3
+   pip install demucs==3.0.6 ffmpeg-python
+
+   # For Spleeter models:
+   pip install tensorflow==2.12.0 spleeter==2.4.0 ffmpeg-python
+
+   # For Band-Split RNN models:
+   pip install torch==2.0.1 torchaudio==2.0.2 band-split-rnn ffmpeg-python
+
+   # For D3Net models:
+   pip install torch==2.0.1 torchaudio==2.0.2 audiofile ffmpeg-python
+   # Clone and install D3Net from source:
+   git clone https://github.com/sony/ai-research-code.git
+   cd ai-research-code/d3net
+   pip install -e .
    ```
 
    **Option C: Install from within the application**
 
-   The application allows you to install Demucs directly from the UI when needed.
+   The application allows you to install models directly from the UI when needed.
 
 ## NumPy/PyTorch Compatibility Fix
 
@@ -72,6 +105,25 @@ This script will:
 2. Detect NumPy 2.x if installed
 3. Uninstall incompatible packages
 4. Install the correct versions of NumPy, PyTorch, and Demucs
+
+You can also specify which models to install with flags:
+
+```
+# For Demucs v3
+./fix_compatibility.sh --demucs-v3
+
+# For Spleeter
+./fix_compatibility.sh --spleeter
+
+# For Band-Split RNN
+./fix_compatibility.sh --bandsplit-rnn
+
+# For D3Net
+./fix_compatibility.sh --d3net
+
+# For multiple models
+./fix_compatibility.sh --spleeter --bandsplit-rnn --d3net
+```
 
 ## External Dependencies
 
@@ -108,7 +160,39 @@ With FFmpeg installed, CaptainStems supports a wide range of audio formats:
 - Common formats: MP3, WAV, FLAC, OGG, M4A, AAC
 - Additional formats: WMA, AIFF, APE, OPUS, MIDI, and many more
 
-If an audio format is not directly supported by Demucs, it will be automatically converted to WAV format before processing.
+If an audio format is not directly supported by the separation models, it will be automatically converted to WAV format before processing.
+
+## Supported Models
+
+### Demucs v4 Models (Default)
+
+- **htdemucs**: Hybrid Transformer Demucs (default)
+- **htdemucs_ft**: Hybrid Transformer Demucs fine-tuned
+- **htdemucs_6s**: Hybrid Transformer Demucs for 6 sources separation (drums, bass, other, vocals, piano, guitar)
+
+### Demucs v3 Models (Legacy)
+
+- **demucs**: Original Demucs v3 model
+- **demucs_extra**: Demucs v3 with extra training
+- **demucs_quantized**: Smaller Demucs v3 model
+- **tasnet**: Conv-TasNet model
+- **tasnet_extra**: Conv-TasNet with extra training
+
+### Spleeter Models
+
+- **2stems**: Separates audio into vocals and accompaniment
+- **4stems**: Separates audio into vocals, drums, bass, and other
+- **5stems**: Separates audio into vocals, drums, bass, piano, and other
+
+### Band-Split RNN Models
+
+- **standard**: Standard 4-source separation (vocals, drums, bass, other)
+- **light**: Lightweight 4-source separation (smaller model, faster processing)
+
+### D3Net Models
+
+- **standard**: Standard 4-source separation model (vocals, drums, bass, other)
+- **optimized**: Optimized version with better performance (same 4 stems)
 
 ## Troubleshooting
 
@@ -126,9 +210,28 @@ Run the compatibility fix script:
 ./fix_compatibility.sh
 ```
 
+You can also specify which models to install with flags:
+
+```
+# For Demucs v3
+./fix_compatibility.sh --demucs-v3
+
+# For Spleeter
+./fix_compatibility.sh --spleeter
+
+# For Band-Split RNN
+./fix_compatibility.sh --bandsplit-rnn
+
+# For D3Net
+./fix_compatibility.sh --d3net
+
+# For multiple models
+./fix_compatibility.sh --spleeter --bandsplit-rnn --d3net
+```
+
 ### Installation Issues
 
-If you encounter other issues installing Demucs or PyTorch:
+If you encounter issues installing dependencies:
 
 1. **Recommended solution**: Use the Python 3.10 compatible environment:
 
@@ -138,7 +241,7 @@ If you encounter other issues installing Demucs or PyTorch:
 
 2. Check your Python version:
 
-   - Demucs and PyTorch work best with Python 3.10
+   - Demucs, Spleeter, and their ML dependencies work best with Python 3.10
    - Python 3.11+ may have compatibility issues with some dependencies
 
 3. Platform-specific issues:
@@ -147,10 +250,6 @@ If you encounter other issues installing Demucs or PyTorch:
    - **Windows/Linux**: Use `pip install torch==2.0.1 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cpu`
 
 4. For more help, check the detailed installation guide in [PROJECT.md](PROJECT.md)
-
-## Supported Models
-
-- [Demucs v4](https://github.com/facebookresearch/demucs) - Facebook Research's music source separation model
 
 ## License
 
