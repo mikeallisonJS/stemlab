@@ -6,6 +6,7 @@ A cross-platform Python GUI application for audio source separation using AI mod
 
 - Drag and drop interface for audio files
 - Support for multiple AI models (Demucs v3/v4, Spleeter, Band-Split RNN, and D3Net)
+- Interactive results window with waveform display and audio playback
 - Save separated audio stems to your local machine
 - Support for a wide range of audio formats (MP3, WAV, FLAC, OGG, M4A, AAC, AIFF, WMA, etc.)
 
@@ -152,6 +153,17 @@ Or use the provided shell script:
 ```
 ./start.sh
 ```
+
+### Visualizing and Playing Stems
+
+After processing an audio file:
+
+1. A results window will automatically open showing the separated stems
+2. Each stem displays a waveform visualization
+3. Use the play/pause button to listen to individual stems
+4. The time slider allows you to navigate through the audio
+5. Click the "Save" button on any stem to save it to your preferred location
+6. Use the "Save All Files" button to save all stems to a directory of your choice
 
 ## Supported Audio Formats
 

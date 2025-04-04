@@ -53,7 +53,9 @@ def check_optional_dependencies():
         'torchaudio': 'Audio processing library for PyTorch',
         'demucs': 'Facebook Research audio source separation model',
         'band_split_rnn': 'Band-Split RNN audio source separation model',
-        'd3net': 'D3Net audio source separation model'
+        'd3net': 'D3Net audio source separation model',
+        'matplotlib': 'Visualization library for audio waveforms',
+        'librosa': 'Audio analysis library for waveform processing'
     }
     
     missing = {}
@@ -111,6 +113,10 @@ def prompt_install_optional(missing_optional):
         print("  Option 1: Use the included script: python install_d3net.py")
         print("  Option 2: Clone from source: git clone https://github.com/sony/ai-research-code.git")
     
+    if 'matplotlib' in missing_optional or 'librosa' in missing_optional:
+        print("\nFor Visualization Dependencies:")
+        print("  Run: pip install matplotlib>=3.5.0 librosa>=0.9.0")
+    
     print("\nNote: You can also install these dependencies within the application.")
     print("="*60)
     
@@ -142,6 +148,14 @@ def prompt_install_optional(missing_optional):
                 print("\nInstalling Demucs...")
                 subprocess.check_call([
                     sys.executable, "-m", "pip", "install", "demucs==4.0.1"
+                ])
+            
+            # Install visualization dependencies if needed
+            if 'matplotlib' in missing_optional or 'librosa' in missing_optional:
+                print("\nInstalling visualization dependencies...")
+                subprocess.check_call([
+                    sys.executable, "-m", "pip", "install", 
+                    "matplotlib>=3.5.0", "librosa>=0.9.0"
                 ])
             
             print("\nOptional dependencies installed successfully!")

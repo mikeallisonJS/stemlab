@@ -1,5 +1,7 @@
 import os
 import sys
+import tempfile
+import subprocess
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QLabel, QPushButton, QComboBox, QFileDialog,
@@ -13,6 +15,8 @@ from models.spleeter_model import SpleeterModel
 from models.bandsplit_model import BandSplitRNNModel
 from models.d3net_model import D3NetModel
 from ui.drop_area import DropArea
+from ui.model_selection_dialog import ModelSelectionDialog
+from ui.results_window import ResultsWindow
 
 
 class MainWindow(QMainWindow):
@@ -45,8 +49,21 @@ class MainWindow(QMainWindow):
         self.bandsplit_models = BandSplitRNNModel.get_available_models()
         self.d3net_models = D3NetModel.get_available_models()
         
+        # Create model collections for the selection dialog
+        self.model_collections = {
+            "DemucsModel": ("Demucs v4", self.demucs_models, DemucsModel),
+            "DemucsV3Model": ("Demucs v3", 
+                            {k: v for k, v in self.demucs_models.items() 
+                             if k in ["demucs", "demucs_extra", "demucs_quantized", "tasnet", "tasnet_extra"]},
+                            DemucsModel),
+            "SpleeterModel": ("Spleeter", self.spleeter_models, SpleeterModel),
+            "BandSplitRNNModel": ("Band-Split RNN", self.bandsplit_models, BandSplitRNNModel),
+            "D3NetModel": ("D3Net", self.d3net_models, D3NetModel)
+        }
+        
         self.current_model = None
         self.current_audio_file = None
+        self.results_window = None
         
         self.init_ui()
     
@@ -126,84 +143,21 @@ class MainWindow(QMainWindow):
         self.on_model_changed(0)
     
     def show_advanced_model_selection(self):
-        dialog = QMessageBox(self)
-        dialog.setWindowTitle("Advanced Models")
-        dialog.setText("Choose an advanced separation model:")
+        # Use the new advanced model selection dialog
+        result = ModelSelectionDialog.get_model(self, self.model_collections)
         
-        # Create buttons for each advanced model
-        # Group by model type
-        v3_models = [k for k in self.demucs_models.keys() if k in ["demucs_extra", "demucs_quantized", "tasnet", "tasnet_extra"]]
-        v4_models = [k for k in self.demucs_models.keys() if k in ["htdemucs_ft", "htdemucs_6s"]]
-        spleeter_models = [k for k in self.spleeter_models.keys() if k in ["4stems", "5stems"]]
-        bandsplit_models = [k for k in self.bandsplit_models.keys() if k in ["light"]]
-        d3net_models = [k for k in self.d3net_models.keys() if k in ["optimized"]]
-        
-        # Add Demucs v3 models
-        dialog.setInformativeText("Demucs v3 Models:")
-        for model_name in v3_models:
-            button = dialog.addButton(f"{model_name}: {self.demucs_models[model_name]}", QMessageBox.ButtonRole.ActionRole)
-            button.model_name = model_name
-            button.model_type = "DemucsModel"
-            button.model_display_name = f"Demucs v3 ({model_name})"
-        
-        # Add Demucs v4 models
-        detailed_text = "Demucs v4 Models:\n" + "\n".join([f"{m}: {self.demucs_models[m]}" for m in v4_models])
-        
-        # Add Spleeter models info
-        detailed_text += "\n\nSpleeter Models:\n" + "\n".join([f"{m}: {self.spleeter_models[m]}" for m in spleeter_models])
-
-        # Add Band-Split RNN models info
-        detailed_text += "\n\nBand-Split RNN Models:\n" + "\n".join([f"{m}: {self.bandsplit_models[m]}" for m in ["standard"] + bandsplit_models])
-        
-        # Add D3Net models info
-        detailed_text += "\n\nD3Net Models:\n" + "\n".join([f"{m}: {self.d3net_models[m]}" for m in ["standard"] + d3net_models])
-        
-        dialog.setDetailedText(detailed_text)
-        
-        # Add Demucs v4 model buttons
-        for model_name in v4_models:
-            button = dialog.addButton(f"{model_name}: {self.demucs_models[model_name]}", QMessageBox.ButtonRole.ActionRole)
-            button.model_name = model_name
-            button.model_type = "DemucsModel"
-            button.model_display_name = f"Demucs v4 ({model_name})"
-        
-        # Add Spleeter model buttons
-        for model_name in spleeter_models:
-            button = dialog.addButton(f"{model_name}: {self.spleeter_models[model_name]}", QMessageBox.ButtonRole.ActionRole)
-            button.model_name = model_name
-            button.model_type = "SpleeterModel"
-            button.model_display_name = f"Spleeter ({model_name})"
-            
-        # Add Band-Split RNN model buttons
-        for model_name in bandsplit_models:
-            button = dialog.addButton(f"{model_name}: {self.bandsplit_models[model_name]}", QMessageBox.ButtonRole.ActionRole)
-            button.model_name = model_name
-            button.model_type = "BandSplitRNNModel"
-            button.model_display_name = f"Band-Split RNN ({model_name})"
-            
-        # Add D3Net model buttons
-        for model_name in d3net_models:
-            button = dialog.addButton(f"{model_name}: {self.d3net_models[model_name]}", QMessageBox.ButtonRole.ActionRole)
-            button.model_name = model_name
-            button.model_type = "D3NetModel"
-            button.model_display_name = f"D3Net ({model_name})"
-        
-        # Add cancel button
-        cancel_button = dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
-        
-        dialog.exec()
-        
-        clicked_button = dialog.clickedButton()
-        if clicked_button is not None and clicked_button is not cancel_button:
-            # Create model and add to models dict
-            model_name = clicked_button.model_name
-            model_type = clicked_button.model_type
-            display_name = clicked_button.model_display_name
+        if result:
+            model_name, model_type, display_name = result
             
             # Check if we already have this model
             if display_name not in self.models:
-                if model_type == "DemucsModel":
-                    self.models[display_name] = DemucsModel(model_name=model_name)
+                # Create the model based on type
+                if model_type == "DemucsModel" or model_type == "DemucsV3Model":
+                    if model_type == "DemucsV3Model":
+                        # Set is_v3 flag for Demucs v3 models
+                        self.models[display_name] = DemucsModel(model_name=model_name, is_v3=True)
+                    else:
+                        self.models[display_name] = DemucsModel(model_name=model_name)
                 elif model_type == "SpleeterModel":
                     self.models[display_name] = SpleeterModel(model_name=model_name)
                 elif model_type == "BandSplitRNNModel":
@@ -322,13 +276,10 @@ class MainWindow(QMainWindow):
         if not self.current_model or not self.current_audio_file:
             return
             
-        # Ask for output directory
-        output_dir = QFileDialog.getExistingDirectory(
-            self, "Select Output Directory", os.path.dirname(self.current_audio_file)
-        )
-        
-        if not output_dir:
-            return
+        # Create a model-specific temporary directory
+        model_name = self.current_model.__class__.__name__
+        model_variant = getattr(self.current_model, 'model_name', 'default')
+        output_dir = tempfile.mkdtemp(prefix=f"captainstems_{model_name}_{model_variant}_")
         
         # Check if we should use two-stems mode (only meaningful for Demucs v4)
         two_stems = False
@@ -358,11 +309,15 @@ class MainWindow(QMainWindow):
         self.progress_bar.setVisible(False)
         self.process_button.setEnabled(True)
         
-        QMessageBox.information(
-            self,
-            "Processing Complete",
-            f"Audio separation complete! Files saved to:\n{output_dir}"
+        # Show the results window with processed stems
+        display_name = self.model_combo.currentText().split(" (not installed)")[0]
+        self.results_window = ResultsWindow(
+            parent=self,
+            source_dir=output_dir,
+            source_audio=self.current_audio_file,
+            model_name=display_name
         )
+        self.results_window.show()
     
     def on_processing_error(self, error_message):
         self.progress_bar.setVisible(False)
@@ -371,7 +326,7 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(
             self,
             "Processing Error",
-            f"An error occurred during processing:\n{error_message}"
+            f"An error occurred during audio separation:\n{error_message}"
         )
 
 
@@ -389,12 +344,12 @@ class ProcessingThread(QThread):
     
     def run(self):
         try:
-            self.model.process(
+            result_dir = self.model.process(
                 self.audio_file,
                 self.output_dir,
                 two_stems=self.two_stems,
                 progress_callback=self.progress_updated.emit
             )
-            self.processing_finished.emit(self.output_dir)
+            self.processing_finished.emit(result_dir)
         except Exception as e:
             self.processing_error.emit(str(e)) 
