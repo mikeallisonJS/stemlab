@@ -9,6 +9,7 @@ A cross-platform Python GUI application for audio source separation using AI mod
 - Interactive results window with waveform display and audio playback
 - Save separated audio stems to your local machine
 - Support for a wide range of audio formats (MP3, WAV, FLAC, OGG, M4A, AAC, AIFF, WMA, etc.)
+- Native GPU acceleration for Apple Silicon Macs with tensorflow-metal
 
 ## Installation
 
@@ -154,6 +155,26 @@ Or use the provided shell script:
 ./start.sh
 ```
 
+### GPU Acceleration
+
+#### Apple Silicon Macs (M1/M2/M3)
+
+CaptainStems automatically detects Apple Silicon Macs and installs tensorflow-macos and tensorflow-metal for GPU acceleration with Spleeter models. This provides significantly faster processing using the built-in GPU and avoids AVX instruction errors that can occur with standard TensorFlow packages.
+
+Requirements:
+
+- macOS 12.0 or later
+- Xcode 13.0 or later with Metal supporting tools
+
+The application will automatically enable Metal GPU acceleration for Spleeter models when running on Apple Silicon Macs if the required dependencies are available.
+
+#### Other Platforms
+
+For other platforms, the application will use CPU processing by default. For advanced GPU acceleration:
+
+- **NVIDIA GPUs**: Install CUDA and cuDNN, then install TensorFlow with GPU support
+- **AMD GPUs**: Support is limited, refer to TensorFlow documentation for options
+
 ### Visualizing and Playing Stems
 
 After processing an audio file:
@@ -240,6 +261,30 @@ You can also specify which models to install with flags:
 # For multiple models
 ./fix_compatibility.sh --spleeter --bandsplit-rnn --d3net
 ```
+
+### TensorFlow AVX Instruction Errors
+
+If you're using an Apple Silicon Mac (M1/M2/M3) and see this error:
+
+```
+The TensorFlow library was compiled to use AVX instructions, but these aren't available on your machine.
+```
+
+This happens because standard TensorFlow packages expect x86 architecture with AVX instructions. To fix this:
+
+1. Use our installation scripts which automatically detect Apple Silicon and install the correct packages:
+
+   ```
+   ./fix_compatibility.sh --spleeter
+   ```
+
+2. Or manually install the correct packages:
+
+   ```
+   pip install tensorflow-macos==2.12.0 tensorflow-metal>=0.7.0 spleeter==2.4.0
+   ```
+
+3. For virtual environments, make sure you're using a recent Python version native to ARM64.
 
 ### Installation Issues
 

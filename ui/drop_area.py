@@ -109,4 +109,17 @@ class DropArea(QFrame):
                 border-radius: 5px;
                 padding: 20px;
             }
+        """)
+    
+    def set_message(self, message):
+        """Set a custom message in the drop area."""
+        self.label.setText(message)
+        # Reset to default style
+        self.setStyleSheet("""
+            QFrame {
+                background-color: #f5f5f5;
+                border: 2px dashed #aaa;
+                border-radius: 5px;
+                padding: 20px;
+            }
         """) 

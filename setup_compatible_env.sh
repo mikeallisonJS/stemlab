@@ -13,14 +13,15 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # Parse command line arguments
-DEMUCS_VERSION=4
+INSTALL_DEMUCS_V3=false
 INSTALL_SPLEETER=false
 INSTALL_BANDSPLIT_RNN=false
 INSTALL_D3NET=false
+INSTALL_TENSORFLOW_METAL=false
 while [[ $# -gt 0 ]]; do
     case $1 in
         --demucs-v3)
-            DEMUCS_VERSION=3
+            INSTALL_DEMUCS_V3=true
             shift
             ;;
         --spleeter)
@@ -35,6 +36,21 @@ while [[ $# -gt 0 ]]; do
             INSTALL_D3NET=true
             shift
             ;;
+        --tensorflow-metal)
+            INSTALL_TENSORFLOW_METAL=true
+            shift
+            ;;
+        --help)
+            echo "Usage: ./setup_compatible_env.sh [options]"
+            echo "Options:"
+            echo "  --demucs-v3         Install Demucs v3 models (default is v4)"
+            echo "  --spleeter          Install Spleeter models"
+            echo "  --bandsplit-rnn     Install Band-Split RNN models"
+            echo "  --d3net             Install D3Net models"
+            echo "  --tensorflow-metal  Install tensorflow-metal for Apple Silicon Macs"
+            echo "  --help              Show this help message"
+            exit 0
+            ;;
         *)
             echo "Unknown option: $1"
             echo "Valid options:"
@@ -42,14 +58,29 @@ while [[ $# -gt 0 ]]; do
             echo "  --spleeter       Install Spleeter models"
             echo "  --bandsplit-rnn  Install Band-Split RNN models"
             echo "  --d3net          Install D3Net models"
+            echo "  --tensorflow-metal  Install tensorflow-metal for Apple Silicon Macs"
+            echo "  --help              Show this help message"
             exit 1
             ;;
     esac
 done
 
+# Check if we're on Apple Silicon Mac
+IS_APPLE_SILICON=false
+if [[ "$(uname)" == "Darwin" && "$(uname -m)" == "arm64" ]]; then
+    IS_APPLE_SILICON=true
+    echo "Detected Apple Silicon Mac"
+    
+    # Automatically enable tensorflow-metal if we're on Apple Silicon
+    if [[ "$INSTALL_SPLEETER" == "true" && "$INSTALL_TENSORFLOW_METAL" != "true" ]]; then
+        INSTALL_TENSORFLOW_METAL=true
+        echo "Enabling tensorflow-metal support for Spleeter on Apple Silicon"
+    fi
+fi
+
 echo -e "${GREEN}=== CaptainStems Compatible Environment Setup ===${NC}"
 echo "This script will create a Python 3.10 virtual environment for CaptainStems."
-if [ "$DEMUCS_VERSION" -eq 3 ]; then
+if [ "$INSTALL_DEMUCS_V3" = true ]; then
     echo "Demucs v3 will be installed."
 else
     echo "Demucs v4 will be installed (default)."
@@ -218,7 +249,7 @@ else
 fi
 
 # Install Demucs with explicit version
-if [ "$DEMUCS_VERSION" -eq 3 ]; then
+if [ "$INSTALL_DEMUCS_V3" = true ]; then
     echo "Installing Demucs v3..."
     pip install demucs==3.0.6
 else
@@ -226,12 +257,26 @@ else
     pip install demucs==4.0.1
 fi
 
-# Install Spleeter if requested
+# Install Spleeter if specified
 if [ "$INSTALL_SPLEETER" = true ]; then
     echo "Installing TensorFlow and Spleeter..."
-    pip install tensorflow==2.12.0 --no-deps
-    pip install tensorflow==2.12.0
+    
+    if [[ "$IS_APPLE_SILICON" == "true" && "$INSTALL_TENSORFLOW_METAL" == "true" ]]; then
+        # Install TensorFlow with Metal support for Apple Silicon
+        echo "Installing TensorFlow with Metal GPU support for Apple Silicon..."
+        python -m pip install tensorflow-macos==2.12.0 tensorflow-metal>=0.7.0
+    else
+        # Standard TensorFlow for other platforms
+        python -m pip install tensorflow==2.12.0
+    fi
+    
     pip install spleeter==2.4.0
+    
+    # Verify Metal GPU support if on Apple Silicon
+    if [[ "$IS_APPLE_SILICON" == "true" && "$INSTALL_TENSORFLOW_METAL" == "true" ]]; then
+        echo "Verifying Metal GPU support..."
+        python -c "import tensorflow as tf; devices = tf.config.list_physical_devices(); metal_devices = [d for d in devices if 'METAL' in str(d).upper()]; print(f'Metal GPU devices: {metal_devices}')"
+    fi
 fi
 
 # Install Band-Split RNN if requested
@@ -290,7 +335,7 @@ echo "  python run.py"
 # Show information about installed models
 echo ""
 
-if [ "$DEMUCS_VERSION" -eq 3 ]; then
+if [ "$INSTALL_DEMUCS_V3" = true ]; then
     echo "Demucs v3 was installed with these available models:"
     echo "  - demucs: Original Demucs v3 model"
     echo "  - demucs_extra: Demucs v3 with extra training"

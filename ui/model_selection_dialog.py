@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
     QLabel, QPushButton, QListWidget, QListWidgetItem, QGridLayout,
-    QFrame, QSplitter, QTextBrowser, QGroupBox
+    QFrame, QSplitter, QTextBrowser, QGroupBox, QDialogButtonBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon
@@ -356,11 +356,15 @@ class ModelSelectionDialog(QDialog):
     @classmethod
     def get_model(cls, parent, model_collections):
         """
-        Show the dialog and get the selected model.
+        Static method to show the dialog and return the selected model.
         
+        Args:
+            parent: Parent widget
+            model_collections: Dictionary of model collections
+            
         Returns:
             Tuple (model_name, model_type, display_name) if a model was selected,
-            None if the dialog was cancelled.
+            None otherwise
         """
         dialog = cls(parent, model_collections)
         result = dialog.exec()

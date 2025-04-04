@@ -5,7 +5,7 @@ import subprocess
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QLabel, QPushButton, QComboBox, QFileDialog,
-    QProgressBar, QMessageBox, QFrame, QCheckBox
+    QProgressBar, QMessageBox, QFrame, QCheckBox, QDialog
 )
 from PyQt6.QtCore import Qt, QMimeData, QUrl, pyqtSignal, QThread
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent
@@ -16,6 +16,7 @@ from models.bandsplit_model import BandSplitRNNModel
 from models.d3net_model import D3NetModel
 from ui.drop_area import DropArea
 from ui.model_selection_dialog import ModelSelectionDialog
+from ui.manage_models_dialog import ManageModelsDialog
 from ui.results_window import ResultsWindow
 
 
@@ -95,15 +96,26 @@ class MainWindow(QMainWindow):
         self.advanced_model_button = QPushButton("Advanced Models...")
         self.advanced_model_button.clicked.connect(self.show_advanced_model_selection)
         
+        # Add manage models button
+        self.manage_models_button = QPushButton("Manage Models...")
+        self.manage_models_button.clicked.connect(self.show_manage_models_dialog)
+        
         model_layout.addWidget(model_label)
         model_layout.addWidget(self.model_combo)
         model_layout.addWidget(self.advanced_model_button)
+        model_layout.addWidget(self.manage_models_button)
         
         # Add install button
         self.install_button = QPushButton("Install Model")
         self.install_button.setVisible(False)
         self.install_button.clicked.connect(self.install_model)
         model_layout.addWidget(self.install_button)
+        
+        # Add remove button
+        self.remove_button = QPushButton("Remove Model")
+        self.remove_button.setVisible(False)
+        self.remove_button.clicked.connect(self.remove_model)
+        model_layout.addWidget(self.remove_button)
         
         model_layout.addStretch()
         
@@ -177,6 +189,61 @@ class MainWindow(QMainWindow):
             if index >= 0:
                 self.model_combo.setCurrentIndex(index)
     
+    def show_manage_models_dialog(self):
+        """
+        Shows a dialog for managing (removing) models.
+        """
+        dialog = ManageModelsDialog(self, self.model_collections)
+        dialog.models_removed.connect(self.remove_models_batch)
+        dialog.exec()
+    
+    def remove_models_batch(self, models_to_remove):
+        """Remove multiple models at once."""
+        if not models_to_remove:
+            return
+            
+        # Get display names for all models to be removed
+        display_names_to_remove = []
+        
+        for model_name, model_type in models_to_remove:
+            # Find the display name used in our combo box
+            for display_name, model in self.models.items():
+                if (isinstance(model, self.model_collections[model_type][2]) and 
+                    getattr(model, 'model_name', None) == model_name):
+                    display_names_to_remove.append(display_name)
+                    break
+        
+        # Remove each model
+        removed_count = 0
+        for display_name in display_names_to_remove:
+            # Find its index in the combo box
+            index = self.model_combo.findData(display_name)
+            if index >= 0:
+                # Remove from combo box
+                self.model_combo.removeItem(index)
+                # Remove from models dictionary
+                self.models.pop(display_name)
+                removed_count += 1
+        
+        # Select the first model in the list
+        if self.model_combo.count() > 0:
+            self.model_combo.setCurrentIndex(0)
+            first_model_name = self.model_combo.itemData(0)
+            self.current_model = self.models.get(first_model_name)
+        else:
+            self.current_model = None
+        
+        # Update UI
+        self.update_ui_state()
+        
+        # Show confirmation
+        if removed_count > 0:
+            QMessageBox.information(
+                self,
+                "Models Removed",
+                f"{removed_count} model{'s' if removed_count > 1 else ''} removed successfully."
+            )
+    
     def on_model_changed(self, index):
         model_name = self.model_combo.itemData(index)
         self.current_model = self.models.get(model_name)
@@ -186,6 +253,18 @@ class MainWindow(QMainWindow):
             self.install_button.setVisible(not self.current_model.available)
         else:
             self.install_button.setVisible(False)
+        
+        # Show remove button for non-default models
+        # Default models are the first 5 models added during initialization
+        default_models = [
+            "Demucs v4 (default)", 
+            "Demucs v3 (default)", 
+            "Spleeter (2stems)", 
+            "Band-Split RNN (standard)",
+            "D3Net (standard)"
+        ]
+        can_remove = model_name not in default_models
+        self.remove_button.setVisible(can_remove)
         
         # Update two-stems checkbox based on model
         is_demucs_v4 = isinstance(self.current_model, DemucsModel) and not getattr(self.current_model, 'is_v3', False)
@@ -214,6 +293,7 @@ class MainWindow(QMainWindow):
             else:
                 self.two_stems_checkbox.setToolTip("Two-stems mode not available for this model")
             
+        # Update UI state to reflect current model and file status
         self.update_ui_state()
     
     def install_model(self):
@@ -231,13 +311,18 @@ class MainWindow(QMainWindow):
             self.progress_bar.setVisible(False)
             
             if success:
+                # Update the model's available property
+                if hasattr(self.current_model, 'available'):
+                    self.current_model.available = True
+                
+                # Show success message
                 QMessageBox.information(
                     self, 
                     "Installation Successful", 
                     f"The {self.current_model.name} model was installed successfully."
                 )
                 
-                # Update the combo box
+                # Update the combo box to remove "(not installed)" text
                 current_index = self.model_combo.currentIndex()
                 model_name = self.model_combo.itemData(current_index)
                 self.model_combo.setItemText(current_index, model_name)
@@ -245,8 +330,13 @@ class MainWindow(QMainWindow):
                 # Hide the install button
                 self.install_button.setVisible(False)
                 
-                # Update UI state
+                # Update UI state to enable processing button if a file is already selected
                 self.update_ui_state()
+                
+                # If a file was previously selected, ensure the drop area shows it
+                if self.current_audio_file:
+                    filename = os.path.basename(self.current_audio_file)
+                    self.drop_area.set_file(filename)
             else:
                 QMessageBox.critical(
                     self, 
@@ -260,17 +350,35 @@ class MainWindow(QMainWindow):
         self.update_ui_state()
     
     def update_ui_state(self):
+        # Check model availability
         model_available = True
         if hasattr(self.current_model, 'available'):
             model_available = self.current_model.available
             
+        # Check if we can process
         can_process = (
             self.current_model is not None and 
             self.current_audio_file is not None and
             model_available
         )
         
+        # Enable or disable the process button
         self.process_button.setEnabled(can_process)
+        
+        # Update drop area message based on state
+        if not model_available and self.current_model is not None:
+            # Model not installed
+            self.drop_area.set_message(f"Model not installed. Click 'Install Model' first.")
+        elif self.current_audio_file is None:
+            # No file selected yet
+            self.drop_area.set_message("Drag an audio file here")
+        elif can_process:
+            # Both model and file are ready
+            filename = os.path.basename(self.current_audio_file)
+            self.drop_area.set_file(filename)
+        else:
+            # Default message
+            self.drop_area.set_message("Drag an audio file here")
     
     def process_audio(self):
         if not self.current_model or not self.current_audio_file:
@@ -328,6 +436,47 @@ class MainWindow(QMainWindow):
             "Processing Error",
             f"An error occurred during audio separation:\n{error_message}"
         )
+
+    def remove_model(self):
+        if not self.current_model:
+            return
+        
+        # Get current model info
+        current_index = self.model_combo.currentIndex()
+        model_name = self.model_combo.itemData(current_index)
+        
+        # Confirm removal
+        confirmation = QMessageBox.question(
+            self,
+            "Confirm Removal",
+            f"Are you sure you want to remove the model '{model_name}'?\n\n"
+            "This will only remove it from the selection list, not from your system.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if confirmation == QMessageBox.StandardButton.Yes:
+            # Remove the model
+            self.model_combo.removeItem(current_index)
+            self.models.pop(model_name)
+            
+            # Select the first model in the list
+            if self.model_combo.count() > 0:
+                self.model_combo.setCurrentIndex(0)
+                first_model_name = self.model_combo.itemData(0)
+                self.current_model = self.models.get(first_model_name)
+            else:
+                self.current_model = None
+            
+            # Update UI
+            self.update_ui_state()
+            
+            # Show confirmation
+            QMessageBox.information(
+                self,
+                "Model Removed",
+                f"The model '{model_name}' has been removed from the selection list."
+            )
 
 
 class ProcessingThread(QThread):

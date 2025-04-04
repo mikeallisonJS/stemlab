@@ -5,6 +5,7 @@ import shutil
 import time
 import sys
 import mimetypes
+import platform
 from typing import Callable, Optional
 
 class SpleeterModel:
@@ -40,7 +41,25 @@ class SpleeterModel:
         self.name = f"Spleeter ({model_name})"
         self.model_name = model_name
         self.available = self.check_dependencies()
-        self.device = "cpu"  # Spleeter CPU/GPU is managed through Tensorflow
+        
+        # Check if running on Apple Silicon Mac
+        self.is_apple_silicon = (
+            platform.system() == "Darwin" and 
+            platform.machine() == "arm64"
+        )
+        
+        # Set device based on platform
+        self.device = "cpu"  # Default device
+        if self.is_apple_silicon:
+            try:
+                # Check if tensorflow-metal is available
+                import tensorflow as tf
+                metal_available = any("METAL" in device.upper() for device in tf.config.list_physical_devices())
+                if metal_available:
+                    self.device = "metal"
+                    print("Using Metal acceleration for Spleeter")
+            except (ImportError, AttributeError):
+                pass  # Fallback to CPU if import fails or tf version doesn't support metal
         
         # Set separation mode based on model type
         if model_name in self.SEPARATION_MODES:
@@ -83,12 +102,30 @@ class SpleeterModel:
                 "numpy>=1.24.0,<2.0.0"
             ])
             
-            # Now install TensorFlow CPU (2.12.x series is stable with Spleeter)
-            print("Installing TensorFlow...")
-            subprocess.check_call([
-                sys.executable, "-m", "pip", "install", 
-                "tensorflow==2.12.0"
-            ])
+            # Detect if we're on Apple Silicon Mac
+            is_apple_silicon = (
+                platform.system() == "Darwin" and 
+                platform.machine() == "arm64"
+            )
+            
+            # Now install TensorFlow based on the platform
+            if is_apple_silicon:
+                print("Detected Apple Silicon Mac, installing TensorFlow with Metal support...")
+                # For M1 Macs, we need to specify tensorflow-macos to avoid AVX instruction errors
+                # and then add tensorflow-metal for GPU acceleration
+                subprocess.check_call([
+                    sys.executable, "-m", "pip", "install", 
+                    "tensorflow-macos==2.12.0", 
+                    "tensorflow-metal>=0.7.0"
+                ])
+                print("TensorFlow with Metal GPU acceleration installed successfully")
+            else:
+                # Install regular TensorFlow for other platforms
+                print("Installing TensorFlow...")
+                subprocess.check_call([
+                    sys.executable, "-m", "pip", "install", 
+                    "tensorflow==2.12.0"
+                ])
             
             # Install Spleeter
             print("Installing Spleeter...")
@@ -107,12 +144,29 @@ class SpleeterModel:
             # Verify installation
             import spleeter
             print(f"Spleeter installed successfully")
+            
+            # Verify Metal GPU acceleration if on Apple Silicon
+            if is_apple_silicon:
+                try:
+                    import tensorflow as tf
+                    physical_devices = tf.config.list_physical_devices()
+                    metal_available = any("METAL" in device.upper() for device in [str(d) for d in physical_devices])
+                    if metal_available:
+                        print("Metal GPU acceleration is available for Spleeter")
+                    else:
+                        print("Metal GPU acceleration not found, using CPU")
+                except Exception as e:
+                    print(f"Error checking Metal acceleration: {e}")
+            
             return True
             
         except Exception as e:
             print(f"Error installing Spleeter: {e}")
             print("\nAlternative installation options:")
-            print("1. Install manually with: pip install numpy<2.0.0 tensorflow==2.12.0 spleeter==2.4.0 ffmpeg-python")
+            if platform.system() == "Darwin" and platform.machine() == "arm64":
+                print("1. Install manually with: pip install numpy<2.0.0 tensorflow==2.12.0 tensorflow-metal spleeter==2.4.0 ffmpeg-python")
+            else:
+                print("1. Install manually with: pip install numpy<2.0.0 tensorflow==2.12.0 spleeter==2.4.0 ffmpeg-python")
             print("2. Try installing with conda: conda install -c conda-forge spleeter ffmpeg-python")
             print("3. Visit https://github.com/deezer/spleeter for installation instructions")
             return False
@@ -221,14 +275,34 @@ class SpleeterModel:
             # Try to install spleeter
             install_success = self.install_dependencies()
             if not install_success:
+                install_instructions = (
+                    "- pip install numpy<2.0.0 tensorflow==2.12.0 tensorflow-metal spleeter==2.4.0" 
+                    if self.is_apple_silicon else
+                    "- pip install numpy<2.0.0 tensorflow==2.12.0 spleeter==2.4.0"
+                )
                 raise ImportError(
                     "Spleeter is not installed and could not be installed automatically.\n"
                     "Please install it manually with one of these methods:\n"
-                    "- pip install numpy<2.0.0 tensorflow==2.12.0 spleeter==2.4.0\n"
+                    f"{install_instructions}\n"
                     "- conda install -c conda-forge spleeter"
                 )
             self.available = True
+        
+        # Set TensorFlow to use Metal if available
+        if self.is_apple_silicon and self.device == "metal":
+            # Make sure this runs before TensorFlow initializes its graph
+            os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
             
+            try:
+                import tensorflow as tf
+                # Enable Metal plugin (doesn't hurt if already enabled)
+                tf.config.experimental.set_visible_devices([], 'CPU')
+                # Log available devices
+                print("TensorFlow devices available:", [str(d) for d in tf.config.list_physical_devices()])
+            except Exception as e:
+                print(f"Warning: Could not configure TensorFlow Metal: {e}")
+                # Continue with CPU if configuration fails
+
         # Create temporary directory for processing
         with tempfile.TemporaryDirectory() as temp_dir:
             # Convert audio if needed
