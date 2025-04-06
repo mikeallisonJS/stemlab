@@ -5,11 +5,13 @@ import shutil
 import time
 import sys
 import mimetypes
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict
 
-class D3NetModel:
+from models.base_model import BaseModel
+
+class D3NetModel(BaseModel):
     """
-    Wrapper for D3Net model for audio source separation.
+    Wrapper for D3Net model from Sony AI Research.
     https://github.com/sony/ai-research-code/tree/master/d3net
     """
     
@@ -18,8 +20,8 @@ class D3NetModel:
     
     # Available D3Net models
     AVAILABLE_MODELS = {
-        "standard": "Standard D3Net model (vocals, drums, bass, other)",
-        "optimized": "Optimized version with better performance"
+        "standard": "Standard 4-source separation (vocals, drums, bass, other)",
+        "optimized": "Higher quality 4-source separation (more compute required)"
     }
     
     # Default separation stems for different model types
@@ -40,6 +42,12 @@ class D3NetModel:
         self.available = self.check_dependencies()
         self.device = "cpu"  # Default to CPU
         
+        # Specify the dependencies for uninstallation
+        self.dependencies = [
+            "d3net",
+            "ffmpeg-python"
+        ]
+        
         # Set separation mode based on model type
         if model_name in self.SEPARATION_MODES:
             self.separation_mode = model_name
@@ -57,8 +65,8 @@ class D3NetModel:
         # Initialize mimetypes
         if not mimetypes.inited:
             mimetypes.init()
-        
-    def check_dependencies(self):
+    
+    def check_dependencies(self) -> bool:
         """Check if d3net is installed."""
         try:
             import d3net
@@ -66,7 +74,7 @@ class D3NetModel:
         except ImportError:
             return False
     
-    def check_ffmpeg(self):
+    def check_ffmpeg(self) -> bool:
         """Check if ffmpeg is installed."""
         try:
             result = subprocess.run(['ffmpeg', '-version'], 
@@ -76,19 +84,12 @@ class D3NetModel:
         except FileNotFoundError:
             return False
     
-    def install_dependencies(self):
+    def install_dependencies(self) -> bool:
         """Install d3net and its dependencies."""
         print("Attempting to install D3Net...")
         
         try:
-            # First, ensure numpy 1.x is installed (to prevent issues with 2.x)
-            print("Installing NumPy 1.x (for compatibility)...")
-            subprocess.check_call([
-                sys.executable, "-m", "pip", "install", 
-                "numpy>=1.24.0,<2.0.0"
-            ])
-            
-            # Install PyTorch first (dependency)
+            # First, ensure torch is installed (dependency)
             print("Installing PyTorch dependencies...")
             if os.uname().machine == 'arm64' and os.uname().sysname == 'Darwin':
                 # M1/M2 Mac - use default PyTorch
@@ -113,10 +114,11 @@ class D3NetModel:
                     "--index-url", "https://download.pytorch.org/whl/cpu"
                 ])
             
-            # Install additional dependencies
-            print("Installing audiofile...")
+            # Now install d3net
+            print("Installing D3Net...")
             subprocess.check_call([
-                sys.executable, "-m", "pip", "install", "audiofile"
+                sys.executable, "-m", "pip", "install", 
+                "d3net"
             ])
             
             # Also install ffmpeg-python for format conversion
@@ -126,29 +128,6 @@ class D3NetModel:
                 "ffmpeg-python"
             ])
             
-            # Install D3Net from source (as it's not available on PyPI)
-            print("Installing D3Net from source...")
-            
-            # Create temporary directory for cloning
-            with tempfile.TemporaryDirectory() as temp_dir:
-                # Clone the repository
-                subprocess.check_call([
-                    "git", "clone", 
-                    "https://github.com/sony/ai-research-code.git",
-                    temp_dir
-                ])
-                
-                # Move to the d3net directory
-                d3net_dir = os.path.join(temp_dir, "d3net")
-                
-                # Install the package
-                if os.path.exists(d3net_dir):
-                    subprocess.check_call([
-                        sys.executable, "-m", "pip", "install", "-e", d3net_dir
-                    ])
-                else:
-                    raise Exception("D3Net directory not found in the repository")
-            
             # Verify installation
             import d3net
             print(f"D3Net installed successfully")
@@ -157,8 +136,8 @@ class D3NetModel:
         except Exception as e:
             print(f"Error installing D3Net: {e}")
             print("\nAlternative installation options:")
-            print("1. Install manually with: pip install numpy<2.0.0 torch==2.0.1 torchaudio==2.0.2")
-            print("2. Install from source: git clone https://github.com/sony/ai-research-code.git && cd ai-research-code/d3net && pip install -e .")
+            print("1. Install manually with: pip install torch==2.0.1 torchaudio==2.0.2 d3net ffmpeg-python")
+            print("2. Install from source: git clone https://github.com/sony/ai-research-code && cd ai-research-code/d3net && pip install -e .")
             return False
     
     def needs_conversion(self, file_path):
@@ -214,7 +193,7 @@ class D3NetModel:
             return input_file
     
     @classmethod
-    def get_available_models(cls):
+    def get_available_models(cls) -> Dict[str, str]:
         """
         Get a dictionary of available D3Net models.
         

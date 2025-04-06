@@ -6,9 +6,11 @@ import time
 import sys
 import mimetypes
 import platform
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict
 
-class SpleeterModel:
+from models.base_model import BaseModel
+
+class SpleeterModel(BaseModel):
     """
     Wrapper for Spleeter model from Deezer Research.
     https://github.com/deezer/spleeter
@@ -40,26 +42,34 @@ class SpleeterModel:
         """
         self.name = f"Spleeter ({model_name})"
         self.model_name = model_name
-        self.available = self.check_dependencies()
+        self.available = False  # Will be updated after dependency check
         
-        # Check if running on Apple Silicon Mac
+        # Detect if we're on Apple Silicon Mac
         self.is_apple_silicon = (
             platform.system() == "Darwin" and 
             platform.machine() == "arm64"
         )
         
+        # Specify the dependencies for uninstallation based on platform
+        if self.is_apple_silicon:
+            self.dependencies = [
+                "spleeter",
+                "tensorflow-macos",
+                "tensorflow-metal",
+                "ffmpeg-python",
+                "numpy"
+            ]
+        else:
+            self.dependencies = [
+                "spleeter",
+                "tensorflow",
+                "ffmpeg-python",
+                "numpy"
+            ]
+        
         # Set device based on platform
         self.device = "cpu"  # Default device
-        if self.is_apple_silicon:
-            try:
-                # Check if tensorflow-metal is available
-                import tensorflow as tf
-                metal_available = any("METAL" in device.upper() for device in tf.config.list_physical_devices())
-                if metal_available:
-                    self.device = "metal"
-                    print("Using Metal acceleration for Spleeter")
-            except (ImportError, AttributeError):
-                pass  # Fallback to CPU if import fails or tf version doesn't support metal
+        self.has_metal = False  # Will be updated during dependency check
         
         # Set separation mode based on model type
         if model_name in self.SEPARATION_MODES:
@@ -71,6 +81,13 @@ class SpleeterModel:
         # Initialize mimetypes
         if not mimetypes.inited:
             mimetypes.init()
+            
+        # Check for dependencies and configure devices
+        self.available = self.check_dependencies()
+        
+        # If available, check for Metal acceleration on Apple Silicon
+        if self.available and self.is_apple_silicon:
+            self.check_metal_acceleration()
         
     def check_dependencies(self):
         """Check if spleeter is installed."""
@@ -111,14 +128,42 @@ class SpleeterModel:
             # Now install TensorFlow based on the platform
             if is_apple_silicon:
                 print("Detected Apple Silicon Mac, installing TensorFlow with Metal support...")
-                # For M1 Macs, we need to specify tensorflow-macos to avoid AVX instruction errors
-                # and then add tensorflow-metal for GPU acceleration
+                
+                # First, install tensorflow-macos which is compatible with ARM architecture
                 subprocess.check_call([
                     sys.executable, "-m", "pip", "install", 
-                    "tensorflow-macos==2.12.0", 
-                    "tensorflow-metal>=0.7.0"
+                    "tensorflow-macos==2.12.0"
                 ])
-                print("TensorFlow with Metal GPU acceleration installed successfully")
+                
+                # Then install tensorflow-metal for GPU acceleration
+                try:
+                    subprocess.check_call([
+                        sys.executable, "-m", "pip", "install", 
+                        "tensorflow-metal>=0.7.0"
+                    ])
+                    print("TensorFlow Metal GPU acceleration installed successfully")
+                except Exception as e:
+                    print(f"Warning: Could not install tensorflow-metal: {e}")
+                    print("Continuing with CPU-only acceleration")
+                    
+                # Verify we're using the correct version
+                print("Verifying TensorFlow installation...")
+                import tensorflow as tf
+                print(f"Installed TensorFlow version: {tf.__version__}")
+                
+                # Check for Metal device
+                try:
+                    physical_devices = tf.config.list_physical_devices()
+                    print(f"Available devices: {physical_devices}")
+                    
+                    metal_available = any("METAL" in str(d).upper() for d in physical_devices)
+                    if metal_available:
+                        print("Metal GPU acceleration is available for Spleeter")
+                    else:
+                        print("Metal GPU device not found, will use CPU")
+                except Exception as e:
+                    print(f"Error checking devices: {e}")
+                
             else:
                 # Install regular TensorFlow for other platforms
                 print("Installing TensorFlow...")
@@ -145,30 +190,24 @@ class SpleeterModel:
             import spleeter
             print(f"Spleeter installed successfully")
             
-            # Verify Metal GPU acceleration if on Apple Silicon
-            if is_apple_silicon:
-                try:
-                    import tensorflow as tf
-                    physical_devices = tf.config.list_physical_devices()
-                    metal_available = any("METAL" in device.upper() for device in [str(d) for d in physical_devices])
-                    if metal_available:
-                        print("Metal GPU acceleration is available for Spleeter")
-                    else:
-                        print("Metal GPU acceleration not found, using CPU")
-                except Exception as e:
-                    print(f"Error checking Metal acceleration: {e}")
-            
             return True
             
         except Exception as e:
             print(f"Error installing Spleeter: {e}")
             print("\nAlternative installation options:")
             if platform.system() == "Darwin" and platform.machine() == "arm64":
-                print("1. Install manually with: pip install numpy<2.0.0 tensorflow==2.12.0 tensorflow-metal spleeter==2.4.0 ffmpeg-python")
+                print("1. Try using our unified script:")
+                print("   python captain.py --install-model spleeter")
+                print("2. Install manually with:")
+                print("   pip install numpy<2.0.0 tensorflow-macos==2.12.0 tensorflow-metal spleeter==2.4.0 ffmpeg-python")
             else:
-                print("1. Install manually with: pip install numpy<2.0.0 tensorflow==2.12.0 spleeter==2.4.0 ffmpeg-python")
-            print("2. Try installing with conda: conda install -c conda-forge spleeter ffmpeg-python")
-            print("3. Visit https://github.com/deezer/spleeter for installation instructions")
+                print("1. Try using our unified script:")
+                print("   python captain.py --install-model spleeter")
+                print("2. Install manually with:")
+                print("   pip install numpy<2.0.0 tensorflow==2.12.0 spleeter==2.4.0 ffmpeg-python")
+                
+            print("3. Try installing with conda: conda install -c conda-forge spleeter ffmpeg-python")
+            print("4. Visit https://github.com/deezer/spleeter for installation instructions")
             return False
     
     def needs_conversion(self, file_path):
@@ -224,7 +263,7 @@ class SpleeterModel:
             return input_file
     
     @classmethod
-    def get_available_models(cls):
+    def get_available_models(cls) -> Dict[str, str]:
         """
         Get a dictionary of available Spleeter models.
         
@@ -259,144 +298,295 @@ class SpleeterModel:
         progress_callback: Optional[Callable[[int], None]] = None
     ) -> str:
         """
-        Process audio file and separate it into stems.
+        Process an audio file using Spleeter.
         
         Args:
-            input_file: Path to audio file
-            output_dir: Directory to save separated stems
-            two_stems: Not used for Spleeter, kept for API compatibility
+            input_file: Path to input audio file
+            output_dir: Path to output directory
+            two_stems: Ignored for Spleeter (kept for API compatibility)
             progress_callback: Function to call with progress updates (0-100)
             
         Returns:
-            Path to the directory with separated stems
+            Path to directory containing separated stems
         """
-        # Check if spleeter is installed
         if not self.available:
-            # Try to install spleeter
-            install_success = self.install_dependencies()
-            if not install_success:
-                install_instructions = (
-                    "- pip install numpy<2.0.0 tensorflow==2.12.0 tensorflow-metal spleeter==2.4.0" 
-                    if self.is_apple_silicon else
-                    "- pip install numpy<2.0.0 tensorflow==2.12.0 spleeter==2.4.0"
-                )
-                raise ImportError(
-                    "Spleeter is not installed and could not be installed automatically.\n"
-                    "Please install it manually with one of these methods:\n"
-                    f"{install_instructions}\n"
-                    "- conda install -c conda-forge spleeter"
-                )
-            self.available = True
-        
-        # Set TensorFlow to use Metal if available
-        if self.is_apple_silicon and self.device == "metal":
-            # Make sure this runs before TensorFlow initializes its graph
-            os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
+            if progress_callback:
+                progress_callback(0)
+            print("Spleeter is not installed. Please install it first.")
+            if progress_callback:
+                progress_callback(100)
+            return None
             
-            try:
-                import tensorflow as tf
-                # Enable Metal plugin (doesn't hurt if already enabled)
-                tf.config.experimental.set_visible_devices([], 'CPU')
-                # Log available devices
-                print("TensorFlow devices available:", [str(d) for d in tf.config.list_physical_devices()])
-            except Exception as e:
-                print(f"Warning: Could not configure TensorFlow Metal: {e}")
-                # Continue with CPU if configuration fails
-
+        if progress_callback:
+            progress_callback(5)
+            
         # Create temporary directory for processing
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Convert audio if needed
+        temp_dir = tempfile.mkdtemp()
+        
+        try:
+            # Check if we need to convert the audio file
             if self.needs_conversion(input_file):
                 if progress_callback:
-                    progress_callback(5)
-                processed_input = self.convert_audio(input_file, temp_dir)
+                    progress_callback(10)
+                input_file = self.convert_audio(input_file, temp_dir)
             else:
-                processed_input = input_file
-            
+                if progress_callback:
+                    progress_callback(15)
+                
+            # Create the final output directory
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir, exist_ok=True)
+                
             if progress_callback:
-                progress_callback(10)
+                progress_callback(20)
                 
-            # Get model-specific command arguments
-            model_args = self.get_model_cmd_args()
+            # Get base filename without extension
+            filename = os.path.basename(input_file)
+            basename = os.path.splitext(filename)[0]
             
-            # Create output directory path inside temp_dir
-            spleeter_output_dir = os.path.join(temp_dir, "output")
+            # Create separator arguments
+            args = self.get_model_cmd_args()
             
-            # Determine the stems value from the model name
-            stems = self.model_name[0] if self.model_name[0].isdigit() else "2"
+            # Set up environment variables for platform-specific optimizations
+            env = os.environ.copy()
+            
+            # For Apple Silicon Macs with Metal support
+            if self.is_apple_silicon:
+                if self.has_metal:
+                    print("Using Metal GPU acceleration for Spleeter")
+                    # These environment variables help ensure proper Metal GPU usage
+                    env["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
+                    env["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+                    env["XLA_FLAGS"] = "--xla_gpu_cuda_data_dir=/usr/local"
+                else:
+                    print("Apple Silicon detected but Metal acceleration not available. Using CPU.")
+            
+            # Platform-specific command arguments
+            if self.is_apple_silicon:
+                # Special handling for Apple Silicon to avoid AVX errors
+                cmd = [
+                    sys.executable, "-m", "spleeter", "separate",
+                    "-p", f"spleeter:{self.separation_mode}",
+                    "-o", output_dir,
+                    input_file,
+                ] + args
+            else:
+                # Standard command for other platforms
+                cmd = [
+                    sys.executable, "-m", "spleeter", "separate",
+                    "-p", f"spleeter:{self.separation_mode}",
+                    "-o", output_dir,
+                    input_file,
+                ] + args
+            
+            print(f"Running Spleeter: {' '.join(cmd)}")
                 
-            # Prepare command
-            # We're using subprocess to call the spleeter command line tool
-            cmd = [
-                sys.executable, "-m", "spleeter",
-            ] + model_args + [
-                "-o", spleeter_output_dir,
-                processed_input
-            ]
-            
-            # Run the process
+            if progress_callback:
+                progress_callback(30)
+                
+            # Run the separation process
             process = subprocess.Popen(
-                cmd, 
+                cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                universal_newlines=True
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+                env=env
             )
             
-            # Track progress
-            if progress_callback and processed_input == input_file:
-                # No conversion happened, start from 0
-                progress_callback(0)
-                
-            # Monitor the process
-            completed = False
-            start_time = time.time()
-            output_lines = []
-            
-            while not completed:
-                if process.poll() is not None:
-                    completed = True
-                    if progress_callback:
-                        progress_callback(100)
-                else:
-                    # Read output line (if available)
-                    if process.stdout:
-                        line = process.stdout.readline()
-                        if line:
-                            output_lines.append(line.strip())
-                            print(line.strip())  # Echo to console
-                    
-                    # Add arbitrary progress based on elapsed time
-                    # This is not ideal but spleeter doesn't provide progress info
-                    elapsed = time.time() - start_time
-                    # Assume process takes about 20 seconds per minute of audio
-                    # This is just a rough estimate
-                    progress = min(95, int(10 + (elapsed / 20 * 85)))  # 10% - 95%
-                    if progress_callback:
-                        progress_callback(progress)
+            # Monitor progress
+            if progress_callback:
+                # Since Spleeter doesn't provide progress updates, we'll simulate progress
+                for i in range(7):
+                    if process.poll() is not None:
+                        break
+                    progress_value = 30 + i * 10
+                    progress_callback(min(90, progress_value))
                     time.sleep(0.5)
             
-            # Check if process was successful
+            # Wait for process to complete
+            stdout, stderr = process.communicate()
+            
+            # Check for errors
             if process.returncode != 0:
-                error_output = "\n".join(output_lines[-10:]) if output_lines else "No output captured"
-                raise Exception(f"Spleeter processing failed with return code {process.returncode}\n\nOutput:\n{error_output}")
+                print(f"Error running Spleeter: {stderr}")
+                if self.is_apple_silicon and "AVX" in stderr:
+                    print("\nERROR: AVX instruction error detected on Apple Silicon.")
+                    print("This typically happens when using the wrong TensorFlow package.")
+                    print("\nTo fix this issue:")
+                    print("1. Run: python captain.py --install-model spleeter")
+                    print("   - This will install tensorflow-macos and tensorflow-metal")
+                    print("2. Or install manually:")
+                    print("   pip uninstall -y tensorflow")
+                    print("   pip install tensorflow-macos==2.12.0 tensorflow-metal>=0.7.0")
+                return None
+                
+            if progress_callback:
+                progress_callback(95)
+                
+            # Return the path to the separated stems
+            result_path = os.path.join(output_dir, basename)
             
-            # Get the track name from the input file
-            track_name = os.path.splitext(os.path.basename(processed_input))[0]
+            if progress_callback:
+                progress_callback(100)
+                
+            return result_path
             
-            # Spleeter creates a directory with the name of the track in the output dir
-            spleeter_track_dir = os.path.join(spleeter_output_dir, track_name)
+        except Exception as e:
+            print(f"Error processing audio: {e}")
+            return None
+        finally:
+            # Clean up temporary directory
+            try:
+                shutil.rmtree(temp_dir)
+            except Exception as e:
+                print(f"Warning: Failed to clean up temp directory: {e}")
+    
+    def uninstall_dependencies(self) -> bool:
+        """
+        Uninstall Spleeter and its dependencies with special handling for Apple Silicon.
+        
+        Returns:
+            bool: True if uninstallation was successful, False otherwise
+        """
+        try:
+            print(f"Uninstalling {self.name} dependencies...")
+            success_count = 0
+            fail_count = 0
             
-            if not os.path.isdir(spleeter_track_dir):
-                raise Exception("Spleeter processing failed to create output directory")
+            # Platform-specific packages with correct versions
+            if self.is_apple_silicon:
+                packages = [
+                    "spleeter==2.4.0",
+                    "tensorflow-macos==2.12.0",
+                    "tensorflow-metal",
+                    "ffmpeg-python",
+                    "numpy<2.0.0",
+                    "protobuf"  # Often causes issues if not properly removed
+                ]
+            else:
+                packages = [
+                    "spleeter==2.4.0",
+                    "tensorflow==2.12.0",
+                    "ffmpeg-python",
+                    "numpy<2.0.0",
+                    "protobuf"
+                ]
             
-            # Create final output directory
-            final_output_dir = os.path.join(output_dir, f"{track_name}_spleeter_{stems}stems")
-            os.makedirs(final_output_dir, exist_ok=True)
+            # First try to uninstall the main package
+            try:
+                print("Removing main package: spleeter")
+                result = subprocess.run(
+                    [sys.executable, "-m", "pip", "uninstall", "-y", "spleeter"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    check=False
+                )
+                
+                if result.returncode == 0:
+                    success_count += 1
+                    print("Successfully uninstalled spleeter")
+                else:
+                    print(f"Failed to uninstall spleeter: {result.stderr}")
+            except Exception as e:
+                print(f"Error uninstalling spleeter: {e}")
             
-            # Copy stems to output directory
-            for stem_file in os.listdir(spleeter_track_dir):
-                src = os.path.join(spleeter_track_dir, stem_file)
-                dst = os.path.join(final_output_dir, stem_file)
-                shutil.copy2(src, dst)
+            # Then try each dependency
+            for package in packages:
+                if package.startswith("spleeter"):
+                    continue  # Already tried to uninstall main package
+                    
+                package_name = package.split("==")[0].split("<")[0]
+                try:
+                    print(f"Removing package: {package_name}")
+                    result = subprocess.run(
+                        [sys.executable, "-m", "pip", "uninstall", "-y", package_name],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        check=False
+                    )
+                    
+                    if result.returncode == 0:
+                        success_count += 1
+                        print(f"Successfully uninstalled {package_name}")
+                    else:
+                        fail_count += 1
+                        print(f"Failed to uninstall {package_name}: {result.stderr}")
+                except Exception as e:
+                    fail_count += 1
+                    print(f"Error uninstalling {package_name}: {e}")
             
-            return final_output_dir 
+            # Special handling for Apple Silicon Macs
+            if self.is_apple_silicon:
+                print("\nSpecial cleanup for Apple Silicon Macs...")
+                
+                # Try to remove TensorFlow Metal plugins
+                tf_packages = [
+                    "tensorflow-plugin-metal",
+                    "tensorflow-metal-plugin",
+                    "tensorflow-metal",
+                    "metal-plugin"
+                ]
+                
+                for pkg in tf_packages:
+                    try:
+                        subprocess.run(
+                            [sys.executable, "-m", "pip", "uninstall", "-y", pkg],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            check=False
+                        )
+                    except:
+                        pass
+            
+            # Consider the operation successful if we uninstalled at least the main package
+            if success_count > 0:
+                print(f"Successfully uninstalled {success_count} packages")
+                
+                # Update availability
+                self.available = False
+                
+                return True
+            else:
+                print(f"Failed to uninstall any packages")
+                return False
+            
+        except Exception as e:
+            print(f"Error during dependency uninstallation: {e}")
+            return False 
+
+    def check_metal_acceleration(self):
+        """Check for Metal GPU acceleration on Apple Silicon."""
+        try:
+            import tensorflow as tf
+            
+            print(f"TensorFlow version: {tf.__version__}")
+            
+            # Check for Metal devices
+            physical_devices = tf.config.list_physical_devices()
+            metal_devices = [d for d in physical_devices if "METAL" in str(d).upper()]
+            
+            if metal_devices:
+                print(f"Metal GPU acceleration is available: {metal_devices}")
+                self.device = "metal"
+                self.has_metal = True
+            else:
+                print("Metal GPU acceleration not found, using CPU")
+                self.device = "cpu"
+                self.has_metal = False
+                
+            # Configure TensorFlow to use Metal if available
+            if self.has_metal:
+                try:
+                    # Allow memory growth to avoid allocating all GPU memory at once
+                    for device in metal_devices:
+                        tf.config.experimental.set_memory_growth(device, True)
+                    print("Configured Metal device for memory growth")
+                except Exception as e:
+                    print(f"Error configuring Metal device: {e}")
+            
+        except (ImportError, AttributeError) as e:
+            print(f"Error checking for Metal acceleration: {e}")
+            self.device = "cpu"
+            self.has_metal = False 

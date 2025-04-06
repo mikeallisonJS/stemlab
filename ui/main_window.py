@@ -14,6 +14,7 @@ from models.demucs_model import DemucsModel
 from models.spleeter_model import SpleeterModel
 from models.bandsplit_model import BandSplitRNNModel
 from models.d3net_model import D3NetModel
+from models.base_model import BaseModel
 from ui.drop_area import DropArea
 from ui.model_selection_dialog import ModelSelectionDialog
 from ui.manage_models_dialog import ManageModelsDialog
@@ -193,8 +194,20 @@ class MainWindow(QMainWindow):
         """
         Shows a dialog for managing (removing) models.
         """
-        dialog = ManageModelsDialog(self, self.model_collections)
+        # Ask if the user wants to see default models too
+        show_defaults = QMessageBox.question(
+            self,
+            "Manage Models",
+            "Would you like to manage both custom and default models?\n\n"
+            "• Yes: Show all models (including defaults) for uninstallation only\n"
+            "• No: Show only custom models (which can be fully removed)",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        ) == QMessageBox.StandardButton.Yes
+        
+        dialog = ManageModelsDialog(self, self.model_collections, show_default_models=show_defaults)
         dialog.models_removed.connect(self.remove_models_batch)
+        dialog.models_uninstalled.connect(self.uninstall_models_batch)
         dialog.exec()
     
     def remove_models_batch(self, models_to_remove):
@@ -243,6 +256,125 @@ class MainWindow(QMainWindow):
                 "Models Removed",
                 f"{removed_count} model{'s' if removed_count > 1 else ''} removed successfully."
             )
+    
+    def uninstall_models_batch(self, models_to_uninstall):
+        """Completely uninstall selected models' dependencies."""
+        if not models_to_uninstall:
+            return
+            
+        # Track results
+        uninstalled_count = 0
+        failed_count = 0
+        uninstalled_models = []
+        failed_models = []
+        
+        # Update progress bar
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setValue(0)
+        
+        total_models = len(models_to_uninstall)
+        current_model = 0
+        
+        # Create instances of each model to uninstall
+        for model_name, model_type in models_to_uninstall:
+            current_model += 1
+            
+            # Get the model class
+            model_class = self.model_collections[model_type][2]
+            
+            # Create an instance
+            model_instance = model_class(model_name=model_name)
+            display_name = f"{self.model_collections[model_type][0]} - {model_name}"
+            
+            # Set progress
+            self.progress_bar.setValue(int((current_model - 1) / total_models * 100))
+            
+            # Special handling for Spleeter on Apple Silicon
+            is_apple_silicon_spleeter = (model_type == "SpleeterModel" and 
+                                         getattr(model_instance, 'is_apple_silicon', False))
+            
+            if is_apple_silicon_spleeter:
+                # Show a warning message about potential M1/M2 Mac issues
+                warn_result = QMessageBox.warning(
+                    self,
+                    "Apple Silicon Warning",
+                    f"Uninstalling Spleeter on Apple Silicon may require additional steps.\n\n"
+                    f"After this process completes, you may need to manually run:\n"
+                    f"pip uninstall -y tensorflow-macos tensorflow-metal\n\n"
+                    f"Do you want to continue with uninstallation?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No
+                )
+                
+                if warn_result == QMessageBox.StandardButton.No:
+                    failed_count += 1
+                    failed_models.append(display_name)
+                    continue
+            
+            # Try to uninstall dependencies
+            try:
+                if model_instance.uninstall_dependencies():
+                    uninstalled_count += 1
+                    uninstalled_models.append(display_name)
+                else:
+                    failed_count += 1
+                    failed_models.append(display_name)
+            except Exception as e:
+                print(f"Error uninstalling {model_type} {model_name}: {e}")
+                failed_count += 1
+                failed_models.append(display_name)
+            
+            # Update progress
+            self.progress_bar.setValue(int(current_model / total_models * 100))
+        
+        # Update UI
+        self.progress_bar.setValue(100)
+        self.progress_bar.setVisible(False)
+        
+        # Create results message
+        message = ""
+        if uninstalled_count > 0:
+            message += f"Successfully uninstalled dependencies for {uninstalled_count} model{'s' if uninstalled_count > 1 else ''}:\n"
+            message += "• " + "\n• ".join(uninstalled_models) + "\n\n"
+            
+        if failed_count > 0:
+            message += f"Failed to uninstall dependencies for {failed_count} model{'s' if failed_count > 1 else ''}:\n"
+            message += "• " + "\n• ".join(failed_models) + "\n\n"
+            
+        message += "Note: Dependencies shared by other models may have been uninstalled."
+        
+        # Show results
+        QMessageBox.information(
+            self,
+            "Uninstallation Results",
+            message
+        )
+        
+        # Update model availability status
+        for model_name in self.models:
+            model = self.models[model_name]
+            if hasattr(model, 'check_dependencies'):
+                model.available = model.check_dependencies()
+        
+        # Update UI to reflect availability changes
+        current_index = self.model_combo.currentIndex()
+        for i in range(self.model_combo.count()):
+            model_name = self.model_combo.itemData(i)
+            model = self.models.get(model_name)
+            
+            if model and hasattr(model, 'available'):
+                display_name = model_name
+                if not model.available:
+                    display_name += " (not installed)"
+                self.model_combo.setItemText(i, display_name)
+        
+        # Restore selection
+        if current_index >= 0 and current_index < self.model_combo.count():
+            self.model_combo.setCurrentIndex(current_index)
+        
+        # Update UI
+        self.on_model_changed(self.model_combo.currentIndex())
+        self.update_ui_state()
     
     def on_model_changed(self, index):
         model_name = self.model_combo.itemData(index)

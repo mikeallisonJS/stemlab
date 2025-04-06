@@ -5,9 +5,11 @@ import shutil
 import time
 import sys
 import mimetypes
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict
 
-class BandSplitRNNModel:
+from models.base_model import BaseModel
+
+class BandSplitRNNModel(BaseModel):
     """
     Wrapper for Band-Split RNN model for audio source separation.
     https://github.com/sevagh/band-split-rnn
@@ -39,6 +41,12 @@ class BandSplitRNNModel:
         self.model_name = model_name
         self.available = self.check_dependencies()
         self.device = "cpu"  # Default to CPU
+        
+        # Specify the dependencies for uninstallation
+        self.dependencies = [
+            "band-split-rnn",
+            "ffmpeg-python"
+        ]
         
         # Set separation mode based on model type
         if model_name in self.SEPARATION_MODES:
@@ -192,7 +200,7 @@ class BandSplitRNNModel:
             return input_file
     
     @classmethod
-    def get_available_models(cls):
+    def get_available_models(cls) -> Dict[str, str]:
         """
         Get a dictionary of available Band-Split RNN models.
         

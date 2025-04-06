@@ -37,8 +37,58 @@ class ModelSelectionDialog(QDialog):
         # Main layout
         main_layout = QVBoxLayout(self)
         
+        # Apply dark theme to dialog
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #1e1e1e;
+                color: #e0e0e0;
+            }
+            QLabel {
+                color: #e0e0e0;
+            }
+            QPushButton {
+                background-color: #2d2d30;
+                color: #e0e0e0;
+                border: 1px solid #3e3e42;
+                padding: 5px 15px;
+            }
+            QPushButton:hover {
+                background-color: #3e3e42;
+            }
+            QPushButton:pressed {
+                background-color: #007acc;
+            }
+            QPushButton:disabled {
+                background-color: #2d2d30;
+                color: #656565;
+            }
+        """)
+        
         # Tabs for model categories
         self.tabs = QTabWidget()
+        # Set styling for tab widget for dark mode
+        self.tabs.setStyleSheet("""
+            QTabWidget::pane {
+                border: 1px solid #3e3e42;
+                background-color: #252526;
+            }
+            QTabBar::tab {
+                background-color: #2d2d30;
+                color: #e0e0e0;
+                padding: 8px 16px;
+                border: 1px solid #3e3e42;
+                border-bottom: none;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+            }
+            QTabBar::tab:selected {
+                background-color: #252526;
+                border-bottom-color: #252526;
+            }
+            QTabBar::tab:hover:!selected {
+                background-color: #3e3e42;
+            }
+        """)
         main_layout.addWidget(self.tabs)
         
         # Add tabs for each model type
@@ -80,6 +130,26 @@ class ModelSelectionDialog(QDialog):
         self.model_lists = getattr(self, 'model_lists', {})
         model_list = QListWidget()
         model_list.setMinimumWidth(250)
+        # Set styling for dark mode
+        model_list.setStyleSheet("""
+            QListWidget {
+                background-color: #252526;
+                color: #e0e0e0;
+                font-family: Arial, sans-serif;
+                font-size: 11pt;
+                border: 1px solid #3e3e42;
+            }
+            QListWidget::item {
+                padding: 4px;
+            }
+            QListWidget::item:selected {
+                background-color: #007acc;
+                color: #ffffff;
+            }
+            QListWidget::item:hover:!selected {
+                background-color: #3e3e42;
+            }
+        """)
         list_layout.addWidget(model_list)
         
         # Add models to the list
@@ -104,6 +174,31 @@ class ModelSelectionDialog(QDialog):
         details_browser = QTextBrowser()
         details_browser.setMinimumWidth(450)
         details_browser.setOpenExternalLinks(True)
+        
+        # Set explicit stylesheet for the text browser for dark mode
+        details_browser.setStyleSheet("""
+            QTextBrowser {
+                background-color: #1e1e1e;
+                color: #e0e0e0;
+                font-family: Arial, sans-serif;
+                font-size: 11pt;
+                border: 1px solid #3e3e42;
+                padding: 8px;
+            }
+            QScrollBar:vertical {
+                background-color: #252526;
+                width: 14px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #3e3e42;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: #007acc;
+            }
+        """)
+        
         details_layout.addWidget(details_browser)
         self.details_browsers[model_type] = details_browser
         
@@ -142,8 +237,53 @@ class ModelSelectionDialog(QDialog):
         models_dict = self.model_collections[model_type][1]
         description = models_dict.get(model_name, "No description available")
         
-        # Get model-specific details
+        # Common CSS style for all model details - dark mode
+        style = """
+        <style>
+            body { 
+                font-family: Arial, sans-serif; 
+                color: #e0e0e0; 
+                background-color: #1e1e1e;
+                margin: 0;
+                padding: 0;
+            }
+            h2 { 
+                color: #62aaff; 
+                border-bottom: 1px solid #3e3e42;
+                padding-bottom: 8px;
+            }
+            h3 { 
+                color: #56cc90;
+                margin-top: 24px; 
+            }
+            p { 
+                line-height: 1.5; 
+            }
+            b { 
+                color: #ffffff; 
+                font-weight: bold;
+            }
+            ul { 
+                margin-left: 20px; 
+                padding-left: 10px;
+            }
+            li { 
+                margin-bottom: 8px; 
+                line-height: 1.4;
+            }
+            a { 
+                color: #0099ff; 
+                text-decoration: none;
+            }
+            a:hover {
+                text-decoration: underline;
+            }
+        </style>
+        """
+        
+        # Base HTML with styling
         details_html = f"""
+        {style}
         <h2>{model_name}</h2>
         <p><b>Type:</b> {self.model_collections[model_type][0]}</p>
         <p><b>Description:</b> {description}</p>
