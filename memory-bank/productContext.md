@@ -30,12 +30,12 @@ CaptainStems solves these problems by providing:
 ## User Flow
 
 1. User launches application
-2. User drags and drops an audio file into the application
+2. User drags and drops one or more audio files (or folders) into the application
 3. User selects desired AI model for source separation
 4. User clicks "Process" button
 5. Application shows progress during processing
-6. Results window appears with separated stems
-7. User can play, preview, and save stems individually or all at once
+6. Results window appears with separated stems (for a batch: on double-click of a finished file)
+7. User can play, preview, and save stems individually or all at once, in the format of their choice
 
 ## User Feedback
 

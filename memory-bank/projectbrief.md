@@ -7,7 +7,7 @@ CaptainStems is a cross-platform GUI application built in Python that enables us
 ## Core Objectives
 
 1. Provide an **intuitive user interface** for audio source separation that requires no technical knowledge
-2. Support **multiple AI models** for audio separation (Demucs v3/v4, Spleeter, Band-Split RNN, D3Net)
+2. Support **multiple AI models** for audio separation (Demucs v3/v4, Spleeter, Band-Split RoFormer, D3Net)
 3. Create a **cross-platform solution** that works consistently on macOS and Windows
 4. Allow for **easy installation** of complex dependencies
 5. Implement an **interactive results interface** with waveform visualization and playback
@@ -31,5 +31,6 @@ CaptainStems is a cross-platform GUI application built in Python that enables us
 
 - Must support Python 3.10 for best compatibility with AI models
 - Must provide fallbacks for newer Python versions (3.11+)
+- Must keep the dependencies of the model backends apart, as they conflict with each other
 - Must handle platform-specific quirks (Apple Silicon, CPU vs GPU)
 - Must accommodate various audio formats through FFmpeg

@@ -1,19 +1,12 @@
+# Dependencies of the application itself.
 PyQt6>=6.5.0
-numpy>=1.24.0,<2.0.0
-soundfile>=0.10.0
-librosa>=0.9.0
-ffmpeg-python>=0.2.0
-audiofile>=0.4.0
-matplotlib>=3.5.0
-# For audio playback in the results window
-PyQt6-Qt6>=6.5.0
-PyQt6-sip>=13.5.0
-# Torch dependencies are installed by setup scripts for better platform compatibility
-# torch==2.0.1
-# torchaudio==2.0.2
-# Optional dependencies for additional models
-# demucs==4.0.1
-# spleeter==2.4.0
-# band-split-rnn>=0.1.0
-# D3Net is not available on PyPI, install from source:
-# git clone https://github.com/sony/ai-research-code.git && cd ai-research-code/d3net && pip install -e . 
+numpy>=1.24.0
+soundfile>=0.12.0
+# Bundles an FFmpeg binary, used when FFmpeg is not installed system-wide
+imageio-ffmpeg>=0.4.9
+
+# The AI models are NOT installed here. Each model family (Demucs, Spleeter,
+# Band-Split RoFormer, D3Net) is installed on demand into its own isolated
+# environment, because their dependencies conflict with each other:
+#   - from the application: "Install Model" or "Manage Models..."
+#   - from the command line: python captain.py --install-model demucs

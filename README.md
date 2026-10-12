@@ -4,212 +4,196 @@ A cross-platform Python GUI application for audio source separation using AI mod
 
 ## Features
 
-- Drag and drop interface for audio files
-- Support for multiple AI models (Demucs v3/v4, Spleeter, Band-Split RNN, and D3Net)
-- Interactive results window with waveform display and audio playback
-- Save separated audio stems to your local machine
-- Support for a wide range of audio formats (MP3, WAV, FLAC, OGG, M4A, AAC, AIFF, WMA, etc.)
-- Native GPU acceleration for Apple Silicon Macs with tensorflow-metal
+- Drag and drop interface for audio files and folders, with a queue for batch processing
+- Support for multiple AI models (Demucs v3/v4, Spleeter, Band-Split RoFormer, and D3Net)
+- Each model family installs into its own isolated environment, straight from the application
+- Interactive results window with waveform display and audio playback, including the original mix for comparison
+- Save separated audio stems as WAV, FLAC, AIFF, MP3, M4A or OGG, optionally automatically after processing
+- Support for a wide range of audio formats (MP3, WAV, FLAC, OGG, M4A, AAC, AIFF, WMA, etc.) and the audio track of video files
+- GPU acceleration: NVIDIA (CUDA), any DirectX 12 GPU for D3Net on Windows, and Metal on Apple Silicon
+- Light and dark theme, and settings that are remembered between sessions
+- Command line mode for separating files without the user interface
 
 ## Installation
 
-### Option 1: Recommended - Use Python 3.10 (Most Compatible)
+CaptainStems needs **Python 3.10** for full model support (see [Python versions](#python-versions)).
 
-Demucs, Spleeter, and their dependencies work best with Python 3.10. Use our setup script to create a compatible environment:
+### Windows
+
+Double-click `start.bat`, or run it from a terminal:
+
+```
+start.bat
+```
+
+It creates a virtual environment on first use, installs the dependencies and starts the application.
+
+### macOS and Linux
 
 ```bash
-./setup_compatible_env.sh
-```
-
-This script will:
-
-1. Check if Python 3.10 is installed (or help you install it)
-2. Check for FFmpeg and offer to install it (required for audio format conversion)
-3. Create a new virtual environment with Python 3.10
-4. Install all dependencies including PyTorch and Demucs
-5. Create a startup script for the compatible environment
-
-### Option 2: Standard Installation
-
-1. Clone this repository
-2. Install the dependencies:
-
-   ```
-   pip install -r requirements.txt
-   ```
-
-3. Install optional AI model dependencies:
-
-   **Option A: Use the dedicated installer scripts**
-
-   ```
-   # For Demucs v4 (default)
-   python install_demucs.py
-
-   # For Demucs v3
-   python install_demucs.py --version 3
-
-   # For Spleeter
-   python install_spleeter.py
-
-   # For Band-Split RNN
-   python install_bandsplit.py
-
-   # For D3Net
-   python install_d3net.py
-   ```
-
-   These scripts provide a guided installation process with platform-specific options.
-
-   **Option B: Manual installation**
-
-   ```
-   # First install NumPy 1.x (important for compatibility)
-   pip install "numpy>=1.24.0,<2.0.0"
-
-   # For Demucs models:
-   # Then install PyTorch and torchaudio
-   pip install torch==2.0.1 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cpu
-   # Then install Demucs (v4 or v3)
-   pip install demucs==4.0.1 ffmpeg-python
-   # Or for Demucs v3
-   pip install demucs==3.0.6 ffmpeg-python
-
-   # For Spleeter models:
-   pip install tensorflow==2.12.0 spleeter==2.4.0 ffmpeg-python
-
-   # For Band-Split RNN models:
-   pip install torch==2.0.1 torchaudio==2.0.2 band-split-rnn ffmpeg-python
-
-   # For D3Net models:
-   pip install torch==2.0.1 torchaudio==2.0.2 audiofile ffmpeg-python
-   # Clone and install D3Net from source:
-   git clone https://github.com/sony/ai-research-code.git
-   cd ai-research-code/d3net
-   pip install -e .
-   ```
-
-   **Option C: Install from within the application**
-
-   The application allows you to install models directly from the UI when needed.
-
-## NumPy/PyTorch Compatibility Fix
-
-If you get errors related to NumPy 2.x and PyTorch compatibility, run the fix script:
-
-```bash
-./fix_compatibility.sh
-```
-
-This script will:
-
-1. Check your current virtual environment
-2. Detect NumPy 2.x if installed
-3. Uninstall incompatible packages
-4. Install the correct versions of NumPy, PyTorch, and Demucs
-
-You can also specify which models to install with flags:
-
-```
-# For Demucs v3
-./fix_compatibility.sh --demucs-v3
-
-# For Spleeter
-./fix_compatibility.sh --spleeter
-
-# For Band-Split RNN
-./fix_compatibility.sh --bandsplit-rnn
-
-# For D3Net
-./fix_compatibility.sh --d3net
-
-# For multiple models
-./fix_compatibility.sh --spleeter --bandsplit-rnn --d3net
-```
-
-## External Dependencies
-
-For full audio format support, you need FFmpeg installed on your system:
-
-- **macOS**: `brew install ffmpeg`
-- **Ubuntu/Debian**: `sudo apt install ffmpeg`
-- **Windows**: Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH
-
-## Usage
-
-If you used the compatible environment setup:
-
-```
-./start_compatible.sh
-```
-
-Otherwise, run the application with:
-
-```
-python run.py
-```
-
-Or use the provided shell script:
-
-```
 ./start.sh
 ```
 
-### GPU Acceleration
+This does the same using `python3.10` if available, otherwise `python3`. If your default Python is newer
+than 3.10, create a dedicated Python 3.10 environment instead:
 
-#### Apple Silicon Macs (M1/M2/M3)
+```bash
+./setup_compatible_env.sh
+./start_compatible.sh
+```
 
-CaptainStems automatically detects Apple Silicon Macs and installs tensorflow-macos and tensorflow-metal for GPU acceleration with Spleeter models. This provides significantly faster processing using the built-in GPU and avoids AVX instruction errors that can occur with standard TensorFlow packages.
+### Manual installation
 
-Requirements:
+```
+pip install -r requirements.txt
+python run.py
+```
 
-- macOS 12.0 or later
-- Xcode 13.0 or later with Metal supporting tools
+`requirements.txt` only contains the application itself (PyQt6, NumPy, soundfile and a bundled FFmpeg).
+The AI models are installed separately, as described next.
 
-The application will automatically enable Metal GPU acceleration for Spleeter models when running on Apple Silicon Macs if the required dependencies are available.
+## Installing models
 
-#### Other Platforms
+Nothing needs to be installed up front. Select a model in the application and click **Install Model**,
+or open **Manage Models...** to install and uninstall model families and see how much disk space they use.
 
-For other platforms, the application will use CPU processing by default. For advanced GPU acceleration:
+Models can also be installed from the command line:
 
-- **NVIDIA GPUs**: Install CUDA and cuDNN, then install TensorFlow with GPU support
-- **AMD GPUs**: Support is limited, refer to TensorFlow documentation for options
+```
+python captain.py --install-model demucs      # Demucs v3 and v4
+python captain.py --install-model spleeter
+python captain.py --install-model bandsplit   # Band-Split RoFormer
+python captain.py --install-model d3net
+python captain.py --install-model all
+
+python captain.py --uninstall-model spleeter  # remove one again
+python captain.py --check                     # show what is installed
+```
+
+The scripts `install_demucs.py`, `install_spleeter.py`, `install_bandsplit.py` and `install_d3net.py` do the same.
+
+### How models are installed
+
+The separation libraries require mutually incompatible versions of NumPy, PyTorch and TensorFlow, so they
+cannot share one Python environment. CaptainStems therefore gives every model family its own virtual
+environment and runs the models as separate processes:
+
+| Platform | Location of environments and model weights            |
+| -------- | ----------------------------------------------------- |
+| Windows  | `%LOCALAPPDATA%\CaptainStems`                         |
+| macOS    | `~/Library/Application Support/CaptainStems`          |
+| Linux    | `~/.local/share/CaptainStems`                         |
+
+Set the `CAPTAINSTEMS_HOME` environment variable to use a different location.
+
+Installing or removing a model never changes the environment the application runs in, and uninstalling a
+model simply deletes its folder. If a model stops working, uninstall and reinstall it.
+
+| Model family        | Download size                    | Runs on                                    |
+| ------------------- | -------------------------------- | ------------------------------------------ |
+| Demucs (v3 and v4)  | ~5 GB with NVIDIA GPU, ~1.5 GB without | NVIDIA GPU (CUDA), Apple GPU, or CPU |
+| Spleeter            | ~1.5 GB                          | CPU (fast)                                 |
+| Band-Split RoFormer | ~6 GB with NVIDIA GPU, ~2 GB without, plus ~650 MB per model | NVIDIA GPU (CUDA), Apple GPU, or CPU (slow) |
+| D3Net               | ~700 MB                          | Any DirectX 12 GPU on Windows, otherwise CPU (slow) |
+
+## Usage
+
+1. Drag audio files or folders into the window (or click the drop area to browse)
+2. Select a model. **Advanced Models...** offers every variant with a description
+3. Click **Process Audio**. Progress is shown per file, and processing can be cancelled
+4. When a single file is done its results window opens. In a batch, double-click a finished file to open its results
 
 ### Visualizing and Playing Stems
 
 After processing an audio file:
 
-1. A results window will automatically open showing the separated stems
-2. Each stem displays a waveform visualization
-3. Use the play/pause button to listen to individual stems
-4. The time slider allows you to navigate through the audio
-5. Click the "Save" button on any stem to save it to your preferred location
-6. Use the "Save All Files" button to save all stems to a directory of your choice
+1. A results window shows the original mix and the separated stems
+2. Each track displays a waveform visualization
+3. Use the play/pause buttons to listen to a track
+4. Click a waveform to jump to that position. Switching to another track continues from the same position,
+   which makes it easy to compare stems with each other and with the original
+5. Choose a format and click "Save..." on any stem to save it to your preferred location
+6. Use the "Save All Files..." button to save all stems into a folder named after the track and model
+
+### Settings
+
+**Settings...** lets you change:
+
+- the theme (follow the system, dark or light)
+- the default format and bitrate for saving stems
+- automatic saving of all stems after processing, next to the source file or into an output folder
+- the device to process on (automatic, CPU only, NVIDIA GPU, Apple GPU)
+- Demucs quality options (number of shifts, overlap) and Wiener filtering for Spleeter
+
+### Command line
+
+Files can be separated without the user interface:
+
+```
+python captain.py --separate song.mp3
+python captain.py --separate *.flac --model htdemucs_ft --format mp3 --bitrate 320k --output stems/
+python captain.py --separate song.wav --model bandsplit:vocals
+python captain.py --separate song.wav --two-stems
+python captain.py --list-models
+```
+
+## GPU Acceleration
+
+#### NVIDIA GPUs
+
+When an NVIDIA GPU is detected, Demucs and Band-Split RoFormer are installed with the CUDA build of PyTorch.
+Only a current NVIDIA driver is required; the CUDA libraries are part of the installation.
+
+#### Windows (any GPU)
+
+D3Net runs through DirectML and uses any DirectX 12 capable GPU, including AMD and Intel ones.
+
+#### Apple Silicon Macs (M1/M2/M3)
+
+CaptainStems detects Apple Silicon Macs and installs `tensorflow-macos` and `tensorflow-metal` for Spleeter,
+which avoids the AVX instruction errors of the standard TensorFlow package. PyTorch based models can use the
+Apple GPU: select "Apple GPU (MPS)" as the device in the settings.
+
+#### CPU
+
+Everything also runs without a GPU. Spleeter is fast on a CPU, Demucs takes a few minutes per song, and
+Band-Split RoFormer and D3Net are slow.
+
+## External Dependencies
+
+FFmpeg is used to read and write audio files. A copy is installed with the application, so nothing needs
+to be set up. If FFmpeg is installed system-wide it is preferred:
+
+- **macOS**: `brew install ffmpeg`
+- **Ubuntu/Debian**: `sudo apt install ffmpeg`
+- **Windows**: `winget install Gyan.FFmpeg`
 
 ## Supported Audio Formats
 
-With FFmpeg installed, CaptainStems supports a wide range of audio formats:
+CaptainStems reads every audio format FFmpeg supports:
 
 - Common formats: MP3, WAV, FLAC, OGG, M4A, AAC
-- Additional formats: WMA, AIFF, APE, OPUS, MIDI, and many more
+- Additional formats: WMA, AIFF, APE, OPUS, AC3, and many more
+- Video files (MP4, MOV, MKV, WEBM, AVI): the audio track is used
 
-If an audio format is not directly supported by the separation models, it will be automatically converted to WAV format before processing.
+Every file is converted to 44.1 kHz stereo before processing. Stems can be saved as WAV, FLAC, AIFF, MP3,
+M4A (AAC) or OGG (Vorbis).
 
 ## Supported Models
 
 ### Demucs v4 Models (Default)
 
 - **htdemucs**: Hybrid Transformer Demucs (default)
-- **htdemucs_ft**: Hybrid Transformer Demucs fine-tuned
+- **htdemucs_ft**: Hybrid Transformer Demucs fine-tuned (best quality, takes four times as long)
 - **htdemucs_6s**: Hybrid Transformer Demucs for 6 sources separation (drums, bass, other, vocals, piano, guitar)
 
 ### Demucs v3 Models (Legacy)
 
-- **demucs**: Original Demucs v3 model
-- **demucs_extra**: Demucs v3 with extra training
-- **demucs_quantized**: Smaller Demucs v3 model
-- **tasnet**: Conv-TasNet model
-- **tasnet_extra**: Conv-TasNet with extra training
+- **hdemucs_mmi**: Hybrid Demucs trained on MusDB plus 800 additional songs
+- **mdx**: Hybrid Demucs trained on MusDB only, winner of track A of the MDX challenge
+- **mdx_extra**: Hybrid Demucs trained with extra data, the best v3 model
+
+All Demucs models offer the "vocals/instrumental only" option.
 
 ### Spleeter Models
 
@@ -217,96 +201,79 @@ If an audio format is not directly supported by the separation models, it will b
 - **4stems**: Separates audio into vocals, drums, bass, and other
 - **5stems**: Separates audio into vocals, drums, bass, piano, and other
 
-### Band-Split RNN Models
+### Band-Split RoFormer Models
 
-- **standard**: Standard 4-source separation (vocals, drums, bass, other)
-- **light**: Lightweight 4-source separation (smaller model, faster processing)
+- **vocals**: Vocals and instrumental, the highest quality vocal separation offered here
+- **6stems**: Vocals, drums, bass, guitar, piano, and other
+
+Band-Split RoFormer is the successor of Band-Split RNN. It is used here because, unlike Band-Split RNN,
+pretrained models for it are publicly available (through
+[python-audio-separator](https://github.com/nomadkaraoke/python-audio-separator)).
 
 ### D3Net Models
 
-- **standard**: Standard 4-source separation model (vocals, drums, bass, other)
-- **optimized**: Optimized version with better performance (same 4 stems)
+- **standard**: 4-source separation model (vocals, drums, bass, other)
+- **fast**: The same model without channel-swap averaging: half the processing time, slightly lower quality
+
+D3Net uses [Sony's official implementation](https://github.com/sony/ai-research-code/tree/master/d3net) and
+pretrained networks, converted to ONNX during installation.
+
+## Python versions
+
+| Python version | Compatibility      | Notes                                                        |
+| -------------- | ------------------ | ------------------------------------------------------------ |
+| 3.10.x         | ✅ **Recommended** | Every model can be installed                                 |
+| 3.9.x          | ⚠️ Limited         | Spleeter and D3Net only                                      |
+| 3.11.x         | ⚠️ Limited         | Everything except D3Net                                      |
+| 3.12.x         | ⚠️ Limited         | Demucs and Band-Split RoFormer only                          |
+| 3.13.x         | ⚠️ Limited         | The application runs; models need a second Python (see below) |
+
+When the application runs on a Python version a model does not support, it looks for a suitable Python
+installation (the `py` launcher on Windows, `python3.10` on the PATH) or uses [uv](https://docs.astral.sh/uv/)
+to create the model's environment. If none is found, the installation explains what is missing.
 
 ## Troubleshooting
 
-### NumPy & PyTorch Compatibility
+### A model fails to install
 
-PyTorch requires NumPy 1.x. If you see error messages about NumPy 2.x compatibility:
+The installation window shows the complete installer output. Common causes:
 
-```
-A module that was compiled using NumPy 1.x cannot be run in NumPy 2.1.3 as it may crash
-```
+- No internet connection, or not enough disk space (see the download sizes above)
+- A Python version the model does not support: install Python 3.10
+- On Windows, very long installation paths: set `CAPTAINSTEMS_HOME` to a short path such as `C:\CaptainStems`
 
-Run the compatibility fix script:
+### A model fails during processing
 
-```
-./fix_compatibility.sh
-```
+Open **Manage Models...**, uninstall the model family and install it again. This recreates its environment
+from scratch without affecting anything else.
 
-You can also specify which models to install with flags:
+### Out of memory on the GPU
 
-```
-# For Demucs v3
-./fix_compatibility.sh --demucs-v3
-
-# For Spleeter
-./fix_compatibility.sh --spleeter
-
-# For Band-Split RNN
-./fix_compatibility.sh --bandsplit-rnn
-
-# For D3Net
-./fix_compatibility.sh --d3net
-
-# For multiple models
-./fix_compatibility.sh --spleeter --bandsplit-rnn --d3net
-```
+Select "CPU only" as the device in the settings, or use a smaller model (for example `htdemucs` instead of
+`htdemucs_ft`).
 
 ### TensorFlow AVX Instruction Errors
 
-If you're using an Apple Silicon Mac (M1/M2/M3) and see this error:
+On Apple Silicon Macs the standard TensorFlow package fails with:
 
 ```
 The TensorFlow library was compiled to use AVX instructions, but these aren't available on your machine.
 ```
 
-This happens because standard TensorFlow packages expect x86 architecture with AVX instructions. To fix this:
+CaptainStems installs `tensorflow-macos` for Spleeter on these machines. If you see this error, make sure
+the application runs on a Python built for ARM64 (not under Rosetta), then reinstall Spleeter.
 
-1. Use our installation scripts which automatically detect Apple Silicon and install the correct packages:
+## Development
 
-   ```
-   ./fix_compatibility.sh --spleeter
-   ```
+Run the tests with:
 
-2. Or manually install the correct packages:
+```
+pip install -r requirements-dev.txt
+python -m pytest
+```
 
-   ```
-   pip install tensorflow-macos==2.12.0 tensorflow-metal>=0.7.0 spleeter==2.4.0
-   ```
-
-3. For virtual environments, make sure you're using a recent Python version native to ARM64.
-
-### Installation Issues
-
-If you encounter issues installing dependencies:
-
-1. **Recommended solution**: Use the Python 3.10 compatible environment:
-
-   ```
-   ./setup_compatible_env.sh
-   ```
-
-2. Check your Python version:
-
-   - Demucs, Spleeter, and their ML dependencies work best with Python 3.10
-   - Python 3.11+ may have compatibility issues with some dependencies
-
-3. Platform-specific issues:
-
-   - **Apple Silicon (M1/M2 Macs)**: Use `pip install torch==2.0.1 torchaudio==2.0.2` without extra flags
-   - **Windows/Linux**: Use `pip install torch==2.0.1 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cpu`
-
-4. For more help, check the detailed installation guide in [PROJECT.md](PROJECT.md)
+The tests that run the real models are skipped by default, see [test/README.md](test/README.md).
+More about the architecture is in [PROJECT.md](PROJECT.md).
 
 ## License
 
