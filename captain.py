@@ -3,15 +3,19 @@
 CaptainStems - Unified Entrypoint Script
 
 This script serves as the single entrypoint for CaptainStems, handling:
-1. Dependency management for all models
-2. Platform-specific setup (especially Apple Silicon)
+1. Dependency management for the application
+2. Model installation (each model family gets its own environment)
 3. Application launching
-4. Model installation
+4. Separating files without the user interface
 
 Usage:
-  python captain.py                    # Run the application with dependency checks
-  python captain.py --setup            # Setup/install dependencies only
-  python captain.py --install-model X  # Install a specific model (demucs, spleeter, etc.)
+  python captain.py                      # Run the application with dependency checks
+  python captain.py --setup              # Setup/install dependencies only
+  python captain.py --check              # Show what is installed
+  python captain.py --list-models        # List the available models
+  python captain.py --install-model X    # Install a model family (demucs, spleeter, bandsplit, d3net, all)
+  python captain.py --uninstall-model X  # Remove a model family again
+  python captain.py --separate song.mp3  # Separate files from the command line
 """
 
 import os
@@ -19,9 +23,32 @@ import sys
 import subprocess
 import platform
 import argparse
-import time
-import shutil
-from typing import Dict, List, Optional, Tuple, Set
+import importlib.util
+from typing import List, Optional
+
+VERSION = "1.0.0"
+
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+REQUIREMENTS_FILE = os.path.join(APP_DIR, "requirements.txt")
+if APP_DIR not in sys.path:
+    sys.path.insert(0, APP_DIR)
+
+# Import name -> package providing it, for the application's own dependencies
+CORE_MODULES = {
+    "PyQt6": "PyQt6",
+    "numpy": "numpy",
+    "soundfile": "soundfile",
+    "imageio_ffmpeg": "imageio-ffmpeg",
+}
+
+# Names accepted by --install-model, mapped to backend keys
+MODEL_ALIASES = {
+    "demucs": "demucs",
+    "demucs-v3": "demucs",
+    "spleeter": "spleeter",
+    "bandsplit": "bandsplit",
+    "d3net": "d3net",
+}
 
 # Define colors for terminal output
 class Colors:
@@ -31,6 +58,20 @@ class Colors:
     BLUE = '\033[0;34m'
     BOLD = '\033[1m'
     NC = '\033[0m'  # No Color
+
+def setup_console() -> None:
+    """Make colored, non-ASCII output work on every terminal."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+    if platform.system() == "Windows":
+        # Enables ANSI escape sequences in the classic Windows console
+        os.system("")
+    if not sys.stdout.isatty():
+        for name in ("GREEN", "YELLOW", "RED", "BLUE", "BOLD", "NC"):
+            setattr(Colors, name, "")
 
 def print_header(title: str) -> None:
     """Print a formatted header."""
@@ -54,518 +95,283 @@ def print_step(msg: str) -> None:
     """Print a step message."""
     print(f"{Colors.BOLD}→ {msg}{Colors.NC}")
 
-# Platform detection
-IS_MACOS = platform.system() == "Darwin"
-IS_WINDOWS = platform.system() == "Windows" or platform.system().startswith("MINGW")
-IS_LINUX = platform.system() == "Linux"
-IS_APPLE_SILICON = IS_MACOS and platform.machine() == "arm64"
-
 # Check Python version
-PYTHON_VERSION = platform.python_version_tuple()
-PYTHON_VERSION_STR = '.'.join(PYTHON_VERSION)
-IS_PYTHON_310_COMPATIBLE = (
-    int(PYTHON_VERSION[0]) == 3 and
-    int(PYTHON_VERSION[1]) >= 10
-)
+PYTHON_VERSION_STR = platform.python_version()
+IS_RECOMMENDED_PYTHON = sys.version_info[:2] == (3, 10)
 
 def check_python_compatibility() -> bool:
     """Check Python version compatibility and print appropriate messages."""
-    if not IS_PYTHON_310_COMPATIBLE:
-        print_warning(f"Detected Python {PYTHON_VERSION_STR}")
-        print_warning("CaptainStems works best with Python 3.10 or newer.")
-        
-        if int(PYTHON_VERSION[1]) >= 12:
-            print_error("Python 3.12+ has known compatibility issues with AI model libraries.")
-            print_warning("Consider using Python 3.10 for best compatibility.")
-            
+    if sys.version_info < (3, 9):
+        print_error(f"Python {PYTHON_VERSION_STR} is too old. CaptainStems needs Python 3.9 or newer.")
         return False
-    
+
     print_success(f"Python {PYTHON_VERSION_STR} detected")
+    if not IS_RECOMMENDED_PYTHON:
+        print_warning("Python 3.10 is recommended: every model supports it.")
+        print_warning("Models that need another version look for a Python 3.10 installation (or uv) when installed.")
     return True
 
 # Package management utilities
-def check_package_installed(package_name: str) -> Tuple[bool, Optional[str]]:
+def missing_core_modules() -> List[str]:
     """
-    Check if a package is installed and return its version.
-    
-    Args:
-        package_name: Name of the package to check
-        
-    Returns:
-        Tuple of (is_installed, version)
-    """
-    try:
-        import pkg_resources
-        try:
-            package = pkg_resources.get_distribution(package_name)
-            return True, package.version
-        except pkg_resources.DistributionNotFound:
-            return False, None
-    except ImportError:
-        print_step("Installing setuptools...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "setuptools"], 
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        import pkg_resources
-        try:
-            package = pkg_resources.get_distribution(package_name)
-            return True, package.version
-        except pkg_resources.DistributionNotFound:
-            return False, None
+    Check which of the application's own dependencies are missing.
 
-def install_package(package_name: str, version: Optional[str] = None) -> bool:
-    """
-    Install a Python package.
-    
-    Args:
-        package_name: Name of the package to install
-        version: Specific version to install
-        
     Returns:
-        True if installation was successful
+        List of package names that are not installed
     """
-    package_spec = package_name
-    if version:
-        package_spec = f"{package_name}=={version}"
-        
-    print_step(f"Installing {package_spec}...")
-    try:
-        result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", package_spec],
-            capture_output=True, text=True
-        )
-        if result.returncode != 0:
-            print_error(f"Failed to install {package_spec}: {result.stderr}")
-            return False
-        return True
-    except Exception as e:
-        print_error(f"Error installing {package_spec}: {e}")
-        return False
-
-def check_dependencies(requirements_file: str) -> List[str]:
-    """
-    Check for missing required packages from requirements.txt.
-    
-    Args:
-        requirements_file: Path to requirements.txt
-        
-    Returns:
-        List of missing packages
-    """
-    try:
-        with open(requirements_file) as f:
-            requirements = []
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith('#'):
-                    continue
-                requirements.append(line)
-        
-        missing = []
-        for requirement in requirements:
-            # Parse package name from requirement spec
-            package = requirement.split('>=')[0].split('==')[0].split('<')[0].strip()
-            if not package:
-                continue
-                
-            installed, _ = check_package_installed(package)
-            if not installed:
-                missing.append(requirement)
-        
-        return missing
-    except FileNotFoundError:
-        print_error(f"Requirements file not found: {requirements_file}")
-        return []
+    return [package for module, package in CORE_MODULES.items()
+            if importlib.util.find_spec(module) is None]
 
 def install_core_dependencies() -> bool:
     """
     Install core dependencies from requirements.txt.
-    
+
     Returns:
-        True if all dependencies were installed successfully
+        True if all dependencies are installed
     """
-    missing = check_dependencies('requirements.txt')
+    missing = missing_core_modules()
     if not missing:
         print_success("All core dependencies are installed")
         return True
-    
-    print_step(f"Installing {len(missing)} missing core dependencies...")
-    for package in missing:
-        print_step(f"Installing {package}...")
-        if not install_package(package):
-            print_error(f"Failed to install {package}")
-            return False
-    
+
+    print_step(f"Installing missing core dependencies: {', '.join(missing)}...")
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", REQUIREMENTS_FILE])
+    except (subprocess.CalledProcessError, OSError) as e:
+        print_error(f"Failed to install core dependencies: {e}")
+        print(f"  Try manually: {sys.executable} -m pip install -r requirements.txt")
+        return False
+
+    importlib.invalidate_caches()
+    still_missing = missing_core_modules()
+    if still_missing:
+        print_error(f"Still missing after installation: {', '.join(still_missing)}")
+        return False
+
     print_success("Core dependencies installed successfully")
     return True
 
-# Model-specific dependency management
-def install_tensorflow_dependencies() -> bool:
+def check_ffmpeg() -> bool:
     """
-    Install TensorFlow and related dependencies with platform-specific handling.
-    
-    Returns:
-        True if installation was successful
-    """
-    print_header("Installing TensorFlow Dependencies")
-    
-    # First ensure NumPy 1.x is installed (TensorFlow requirement)
-    print_step("Installing NumPy 1.x (required for TensorFlow)...")
-    if not install_package("numpy", "1.24.3"):
-        return False
-    
-    if IS_APPLE_SILICON:
-        print_step("Installing TensorFlow for Apple Silicon...")
-        
-        # Install Apple-specific TensorFlow
-        if not install_package("tensorflow-macos", "2.12.0"):
-            return False
-        
-        # Install Metal plugin for GPU acceleration
-        print_step("Installing Metal GPU support...")
-        if not install_package("tensorflow-metal", "0.8.0"):
-            print_warning("Could not install tensorflow-metal. Continuing with CPU-only support.")
-        else:
-            print_success("Metal GPU acceleration enabled")
-            
-    else:
-        # Standard TensorFlow for other platforms
-        print_step("Installing TensorFlow...")
-        if not install_package("tensorflow", "2.12.0"):
-            return False
-    
-    # Verify TensorFlow installation
-    print_step("Verifying TensorFlow installation...")
-    try:
-        import tensorflow as tf
-        print_success(f"TensorFlow {tf.__version__} installed successfully")
-        
-        # Check for Metal devices on Apple Silicon
-        if IS_APPLE_SILICON:
-            try:
-                physical_devices = tf.config.list_physical_devices()
-                metal_devices = [d for d in physical_devices if "METAL" in str(d).upper()]
-                if metal_devices:
-                    print_success(f"Metal GPU acceleration available: {metal_devices}")
-                else:
-                    print_warning("Metal GPU acceleration not detected")
-            except Exception as e:
-                print_warning(f"Error checking Metal devices: {e}")
-                
-        return True
-        
-    except ImportError as e:
-        print_error(f"TensorFlow verification failed: {e}")
-        return False
+    Report which FFmpeg will be used.
 
-def install_pytorch_dependencies() -> bool:
-    """
-    Install PyTorch and related dependencies with platform-specific handling.
-    
-    Returns:
-        True if installation was successful
-    """
-    print_header("Installing PyTorch Dependencies")
-    
-    # First ensure NumPy 1.x is installed
-    print_step("Installing NumPy 1.x (required for PyTorch)...")
-    if not install_package("numpy", "1.24.3"):
-        return False
-    
-    if IS_APPLE_SILICON:
-        # Native PyTorch for Apple Silicon
-        print_step("Installing PyTorch for Apple Silicon...")
-        try:
-            subprocess.check_call([
-                sys.executable, "-m", "pip", "install",
-                "torch==2.0.1", "torchaudio==2.0.2",
-            ])
-            print_success("PyTorch installed successfully")
-        except subprocess.CalledProcessError as e:
-            print_error(f"Failed to install PyTorch: {e}")
-            return False
-    else:
-        # CPU-only PyTorch for other platforms
-        print_step("Installing PyTorch (CPU version)...")
-        try:
-            subprocess.check_call([
-                sys.executable, "-m", "pip", "install",
-                "torch==2.0.1", "torchaudio==2.0.2",
-                "--index-url", "https://download.pytorch.org/whl/cpu"
-            ])
-            print_success("PyTorch installed successfully")
-        except subprocess.CalledProcessError as e:
-            print_error(f"Failed to install PyTorch: {e}")
-            return False
-    
-    # Verify PyTorch installation
-    print_step("Verifying PyTorch installation...")
-    try:
-        import torch
-        import torchaudio
-        
-        print_success(f"PyTorch {torch.__version__} installed successfully")
-        print_success(f"TorchAudio {torchaudio.__version__} installed successfully")
-        
-        # Report device availability
-        device = "CPU"
-        if torch.cuda.is_available():
-            device = f"CUDA (GPU): {torch.cuda.get_device_name(0)}"
-        elif IS_APPLE_SILICON and torch.backends.mps.is_available():
-            device = "Apple Metal (MPS)"
-        
-        print_success(f"PyTorch will use: {device}")
-        return True
-        
-    except ImportError as e:
-        print_error(f"PyTorch verification failed: {e}")
-        return False
-
-def install_ffmpeg() -> bool:
-    """
-    Check for FFmpeg and install if necessary.
-    
     Returns:
         True if FFmpeg is available
     """
-    # Check if FFmpeg is already installed
-    try:
-        result = subprocess.run(['ffmpeg', '-version'], 
-                               stdout=subprocess.PIPE, 
-                               stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            print_success("FFmpeg is already installed")
-            return True
-    except FileNotFoundError:
-        print_warning("FFmpeg not found")
-    
-    # Install FFmpeg based on platform
-    if IS_MACOS:
-        print_step("Installing FFmpeg via Homebrew...")
-        try:
-            # Check if Homebrew is installed
-            brew_result = subprocess.run(['which', 'brew'], 
-                                       stdout=subprocess.PIPE, 
-                                       stderr=subprocess.PIPE)
-            if brew_result.returncode != 0:
-                print_warning("Homebrew not found. Please install FFmpeg manually:")
-                print("  Visit: https://ffmpeg.org/download.html")
-                print("  Or install Homebrew (https://brew.sh) and run: brew install ffmpeg")
-                return False
-            
-            # Install FFmpeg using Homebrew
-            subprocess.run(['brew', 'install', 'ffmpeg'], check=True)
-            print_success("FFmpeg installed successfully")
-            return True
-        except Exception as e:
-            print_error(f"Failed to install FFmpeg: {e}")
-            return False
-            
-    elif IS_LINUX:
-        print_step("Installing FFmpeg via package manager...")
-        try:
-            # Try apt-get (Debian/Ubuntu)
-            apt_result = subprocess.run(['which', 'apt-get'], 
-                                      stdout=subprocess.PIPE, 
-                                      stderr=subprocess.PIPE)
-            if apt_result.returncode == 0:
-                subprocess.run(['sudo', 'apt-get', 'update'], check=True)
-                subprocess.run(['sudo', 'apt-get', 'install', '-y', 'ffmpeg'], check=True)
-                print_success("FFmpeg installed successfully")
-                return True
-                
-            # Try dnf (Fedora)
-            dnf_result = subprocess.run(['which', 'dnf'], 
-                                      stdout=subprocess.PIPE, 
-                                      stderr=subprocess.PIPE)
-            if dnf_result.returncode == 0:
-                subprocess.run(['sudo', 'dnf', 'install', '-y', 'ffmpeg'], check=True)
-                print_success("FFmpeg installed successfully")
-                return True
-                
-            print_warning("Could not determine package manager. Please install FFmpeg manually:")
-            print("  For Ubuntu/Debian: sudo apt-get install ffmpeg")
-            print("  For Fedora: sudo dnf install ffmpeg")
-            print("  For other distributions: https://ffmpeg.org/download.html")
-            return False
-            
-        except Exception as e:
-            print_error(f"Failed to install FFmpeg: {e}")
-            return False
-    
-    else:
-        print_warning("Automatic FFmpeg installation not supported on this platform.")
-        print("Please install FFmpeg manually:")
-        print("  Visit: https://ffmpeg.org/download.html")
-        return False
+    from core import ffmpeg
 
-# Model-specific installation functions
-def install_demucs(version: int = 4) -> bool:
+    if ffmpeg.has_system_ffmpeg():
+        print_success("FFmpeg is installed")
+        return True
+    if ffmpeg.find_ffmpeg():
+        print_success("Using the FFmpeg bundled with imageio-ffmpeg")
+        return True
+    print_warning("FFmpeg not found. Install it with:")
+    print(f"  {ffmpeg.install_hint()}")
+    return False
+
+# Model management
+def resolve_backends(name: str) -> List[str]:
+    """Translate a --install-model argument into backend keys."""
+    from models import registry
+
+    if name == "all":
+        return list(registry.backend_models())
+    return [MODEL_ALIASES[name]]
+
+def install_model(name: str) -> bool:
     """
-    Install Demucs and its dependencies.
-    
+    Install a model family into its own environment.
+
     Args:
-        version: Demucs version (3 or 4)
-        
+        name: demucs, spleeter, bandsplit, d3net or all
+
     Returns:
         True if installation was successful
     """
-    print_header(f"Installing Demucs v{version}")
-    
-    # Install PyTorch dependencies first
-    if not install_pytorch_dependencies():
-        print_error("Failed to install PyTorch dependencies for Demucs")
-        return False
-    
-    # Install ffmpeg-python
-    print_step("Installing ffmpeg-python...")
-    if not install_package("ffmpeg-python"):
-        print_warning("Failed to install ffmpeg-python")
-    
-    # Install Demucs based on version
-    if version == 3:
-        print_step("Installing Demucs v3...")
-        if not install_package("demucs", "3.0.6"):
-            print_error("Failed to install Demucs v3")
+    from models import registry
+
+    models = registry.backend_models()
+    success = True
+    for backend in resolve_backends(name):
+        model = models[backend]
+        title = registry.BACKEND_TITLES[backend]
+        print_header(f"Installing {title}")
+        print_step(f"Environment: {model.env.path}")
+        print_step(f"Download size: {model.INSTALL_SIZE}")
+        try:
+            installed = model.install_dependencies(log=lambda line: print(f"  {line}"))
+        except KeyboardInterrupt:
+            model.env.remove()
+            print_error("Installation cancelled")
             return False
-    else:
-        print_step("Installing Demucs v4...")
-        if not install_package("demucs", "4.0.1"):
-            print_error("Failed to install Demucs v4")
-            return False
-    
-    print_success(f"Demucs v{version} installed successfully")
-    return True
+        if installed:
+            print_success(f"{title} installed successfully")
+        else:
+            print_error(f"Failed to install {title}")
+            success = False
+    return success
 
-def install_spleeter() -> bool:
+def uninstall_model(name: str) -> bool:
     """
-    Install Spleeter and its dependencies.
-    
-    Returns:
-        True if installation was successful
-    """
-    print_header("Installing Spleeter")
-    
-    # Install TensorFlow dependencies first (platform-specific)
-    if not install_tensorflow_dependencies():
-        print_error("Failed to install TensorFlow dependencies for Spleeter")
-        return False
-    
-    # Install ffmpeg-python
-    print_step("Installing ffmpeg-python...")
-    if not install_package("ffmpeg-python"):
-        print_warning("Failed to install ffmpeg-python")
-    
-    # Install Spleeter
-    print_step("Installing Spleeter...")
-    if not install_package("spleeter", "2.4.0"):
-        print_error("Failed to install Spleeter")
-        return False
-    
-    print_success("Spleeter installed successfully")
-    return True
+    Remove a model family: its environment and downloaded weights.
 
-def install_bandsplit_rnn() -> bool:
-    """
-    Install Band-Split RNN and its dependencies.
-    
     Returns:
-        True if installation was successful
+        True if everything was removed
     """
-    print_header("Installing Band-Split RNN")
-    
-    # Install PyTorch dependencies first
-    if not install_pytorch_dependencies():
-        print_error("Failed to install PyTorch dependencies for Band-Split RNN")
-        return False
-    
-    # Install ffmpeg-python
-    print_step("Installing ffmpeg-python...")
-    if not install_package("ffmpeg-python"):
-        print_warning("Failed to install ffmpeg-python")
-    
-    # Install Band-Split RNN
-    print_step("Installing Band-Split RNN...")
-    if not install_package("band-split-rnn"):
-        print_error("Failed to install Band-Split RNN")
-        return False
-    
-    print_success("Band-Split RNN installed successfully")
-    return True
+    from models import registry
 
-def install_d3net() -> bool:
+    models = registry.backend_models()
+    success = True
+    for backend in resolve_backends(name):
+        title = registry.BACKEND_TITLES[backend]
+        print_step(f"Removing {title}...")
+        if models[backend].uninstall_dependencies():
+            print_success(f"{title} removed")
+        else:
+            print_error(f"Could not remove all files of {title}")
+            success = False
+    return success
+
+def list_models() -> None:
+    """Print the available models and whether they are installed."""
+    from models import registry
+
+    installed = {backend: model.available for backend, model in registry.backend_models().items()}
+    for family in registry.FAMILIES.values():
+        state = "installed" if installed[family.backend] else "not installed"
+        print(f"\n{Colors.BOLD}{family.title}{Colors.NC} ({state})")
+        for model_name, description in family.models.items():
+            identifier = registry.model_id(family.key, model_name)
+            print(f"  {identifier:<24} {description}")
+
+def check_status() -> int:
+    """Print the state of the installation."""
+    print_header("Checking Dependencies")
+    check_python_compatibility()
+
+    print_step("Checking core dependencies...")
+    missing = missing_core_modules()
+    if missing:
+        print_warning(f"Missing {len(missing)} core dependencies")
+        for package in missing:
+            print(f"  - {package}")
+        print(f"  Run: {os.path.basename(sys.executable)} captain.py --setup")
+        return 1
+    print_success("All core dependencies are installed")
+    check_ffmpeg()
+
+    from core import paths
+    from core.envs import has_nvidia_gpu
+    from models import registry
+
+    print_success("NVIDIA GPU detected" if has_nvidia_gpu() else "No NVIDIA GPU detected (models run on the CPU)")
+
+    print("\nModel status:")
+    for backend, model in registry.backend_models().items():
+        title = registry.BACKEND_TITLES[backend]
+        if model.available:
+            details = [model.env.info().get("package"), paths.format_size(model.installed_size())]
+            print_success(f"{title} is installed ({', '.join(d for d in details if d)})")
+        else:
+            print_warning(f"{title} is not installed")
+    print(f"\nModels are stored in: {paths.app_data_dir()}")
+    return 0
+
+def separate_files(args) -> int:
     """
-    Install D3Net and its dependencies.
-    
+    Separate audio files from the command line.
+
     Returns:
-        True if installation was successful
+        Exit code
     """
-    print_header("Installing D3Net")
-    
-    # Install PyTorch dependencies first
-    if not install_pytorch_dependencies():
-        print_error("Failed to install PyTorch dependencies for D3Net")
-        return False
-    
-    # Install ffmpeg-python
-    print_step("Installing ffmpeg-python...")
-    if not install_package("ffmpeg-python"):
-        print_warning("Failed to install ffmpeg-python")
-    
-    # Install audiofile
-    print_step("Installing audiofile...")
-    if not install_package("audiofile"):
-        print_warning("Failed to install audiofile")
-    
-    # Check if D3Net is already installed
-    installed, _ = check_package_installed("d3net")
-    if installed:
-        print_success("D3Net is already installed")
-        return True
-    
-    # Clone and install D3Net from source
-    print_step("Installing D3Net from source...")
+    from core import paths, pipeline
+    from core.settings import DEFAULTS
+    from models import registry
+
+    identifier = registry.find_model_id(args.model)
+    if identifier is None:
+        print_error(f"Unknown model: {args.model}")
+        print("  Use --list-models to see the available models.")
+        return 2
+    model = registry.create_model(identifier)
+    label = registry.display_name(identifier)
+    if not model.available:
+        print_error(f"{label} is not installed.")
+        print(f"  Install it with: python captain.py --install-model {model.BACKEND}")
+        return 1
+    if args.two_stems and not model.supports_two_stems:
+        print_warning(f"{label} does not support two-stems mode. Ignoring --two-stems.")
+        args.two_stems = False
+
+    options = {
+        "device": args.device,
+        "demucs_shifts": DEFAULTS["demucs_shifts"],
+        "demucs_overlap": DEFAULTS["demucs_overlap"],
+        "spleeter_mwf": DEFAULTS["spleeter_mwf"],
+    }
+
+    print_header(f"Separating with {label}")
+    session_dir = paths.new_session_dir()
+    folders = pipeline.ExportFolders()
+    failures = 0
     try:
-        # Create a temporary directory for cloning
-        temp_dir = os.path.join(tempfile.gettempdir(), "d3net_install")
-        os.makedirs(temp_dir, exist_ok=True)
-        
-        # Clone the repo
-        print_step("Cloning D3Net repository...")
-        subprocess.run(
-            ["git", "clone", "https://github.com/sony/ai-research-code.git", temp_dir],
-            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
-        
-        # Install D3Net
-        print_step("Installing D3Net package...")
-        d3net_dir = os.path.join(temp_dir, "d3net")
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-e", d3net_dir],
-            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
-        
-        # Cleanup
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        
-        print_success("D3Net installed successfully")
-        return True
-        
-    except Exception as e:
-        print_error(f"Failed to install D3Net: {e}")
-        return False
+        for source in args.separate:
+            print_step(os.path.basename(source))
+            last = {"status": "", "percent": -1}
+
+            def show(percent=None, status=None):
+                if status is not None:
+                    last["status"] = status
+                if percent is not None:
+                    last["percent"] = percent
+                if sys.stdout.isatty():
+                    print(f"\r  {last['status']:<40} {max(0, last['percent']):3d}%", end="", flush=True)
+                elif status is not None:
+                    print(f"  {status}", flush=True)
+
+            try:
+                result = pipeline.separate_file(
+                    model, source, session_dir,
+                    two_stems=args.two_stems,
+                    options=options,
+                    progress=lambda value: show(percent=value),
+                    status=lambda text: show(status=text),
+                    model_label=label,
+                )
+                destination = args.output or os.path.dirname(os.path.abspath(source))
+                folder = pipeline.export_result(result, destination, args.format, args.bitrate,
+                                                folders=folders)
+                result.discard()
+            except KeyboardInterrupt:
+                print()
+                print_error("Cancelled")
+                return 130
+            except Exception as e:
+                if sys.stdout.isatty():
+                    print()
+                print_error(f"Failed: {e}")
+                failures += 1
+                continue
+            if sys.stdout.isatty():
+                print()
+            print_success(f"Stems saved to {folder}")
+    finally:
+        paths.remove_tree(session_dir)
+    return 1 if failures else 0
 
 def run_application() -> int:
     """
     Run the main application.
-    
+
     Returns:
         Exit code from the application
     """
     print_header("Starting CaptainStems")
-    
+
     try:
         # Run the main application
-        return subprocess.call([sys.executable, "main.py"])
+        return subprocess.call([sys.executable, os.path.join(APP_DIR, "main.py")])
     except Exception as e:
         print_error(f"Error running application: {e}")
         return 1
@@ -573,167 +379,103 @@ def run_application() -> int:
 def setup_environment() -> bool:
     """
     Set up the environment with core dependencies.
-    
+
     Returns:
         True if setup was successful
     """
     print_header("Setting Up CaptainStems Environment")
-    
+
     # Check Python compatibility
-    check_python_compatibility()
-    
+    if not check_python_compatibility():
+        return False
+
     # Check/install core dependencies
     if not install_core_dependencies():
         print_error("Failed to install core dependencies")
         return False
-    
+
     # Check for FFmpeg
-    if not install_ffmpeg():
-        print_warning("FFmpeg installation failed or skipped")
-        print_warning("Some audio conversion features may be limited")
-    
+    if not check_ffmpeg():
+        print_warning("Audio files cannot be read without FFmpeg")
+
     print_success("Environment setup complete")
     return True
 
-def main() -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     """
     Main entry point.
-    
+
     Returns:
         Exit code
     """
+    setup_console()
+
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="CaptainStems - Audio Source Separation Tool")
     parser.add_argument("--setup", action="store_true", help="Set up environment only")
-    parser.add_argument("--install-model", choices=["demucs", "demucs-v3", "spleeter", "bandsplit", "d3net", "all"],
-                      help="Install a specific model")
+    parser.add_argument("--install-model", choices=sorted(MODEL_ALIASES) + ["all"],
+                      help="Install a model family into its own environment")
+    parser.add_argument("--uninstall-model", choices=sorted(MODEL_ALIASES) + ["all"],
+                      help="Remove a model family and its downloaded weights")
     parser.add_argument("--check", action="store_true", help="Check dependency status only")
+    parser.add_argument("--list-models", action="store_true", help="List the available models")
     parser.add_argument("--version", action="store_true", help="Show version information")
-    
-    args = parser.parse_args()
-    
+
+    separation = parser.add_argument_group("separating files without the user interface")
+    separation.add_argument("--separate", nargs="+", metavar="FILE", help="Audio files to separate")
+    separation.add_argument("--model", default="demucs4:htdemucs",
+                          help="Model to use, see --list-models (default: demucs4:htdemucs)")
+    separation.add_argument("--two-stems", action="store_true",
+                          help="Separate into vocals and instrumental only (Demucs)")
+    separation.add_argument("--output", metavar="DIR",
+                          help="Folder for the stems (default: next to each file)")
+    separation.add_argument("--format", default="wav", choices=["wav", "flac", "aiff", "mp3", "m4a", "ogg"],
+                          help="Audio format of the stems (default: wav)")
+    separation.add_argument("--bitrate", default="320k", choices=["128k", "192k", "256k", "320k"],
+                          help="Bitrate for mp3, m4a and ogg (default: 320k)")
+    separation.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda", "mps"],
+                          help="Device to run the model on (default: auto)")
+
+    args = parser.parse_args(argv)
+
     # Show version information
     if args.version:
         print("CaptainStems - Audio Source Separation Tool")
-        print("Version: 1.0.0")
+        print(f"Version: {VERSION}")
         print(f"Python: {PYTHON_VERSION_STR}")
         print(f"Platform: {platform.system()} {platform.machine()}")
-        if IS_APPLE_SILICON:
-            print("Apple Silicon detected: Using native acceleration")
         return 0
-    
+
     # Check dependencies only
     if args.check:
-        print_header("Checking Dependencies")
-        check_python_compatibility()
-        
-        print_step("Checking core dependencies...")
-        missing = check_dependencies('requirements.txt')
-        if not missing:
-            print_success("All core dependencies are installed")
-        else:
-            print_warning(f"Missing {len(missing)} core dependencies")
-            for package in missing:
-                print(f"  - {package}")
-        
-        # Check model dependencies
-        try:
-            print_step("Checking model dependencies...")
-            
-            # Check PyTorch (for Demucs, Band-Split RNN, D3Net)
-            pytorch_installed, pytorch_version = check_package_installed("torch")
-            if pytorch_installed:
-                print_success(f"PyTorch {pytorch_version} is installed")
-            else:
-                print_warning("PyTorch is not installed")
-            
-            # Check TensorFlow (for Spleeter)
-            tf_installed, tf_version = check_package_installed("tensorflow")
-            tf_macos_installed, tf_macos_version = check_package_installed("tensorflow-macos")
-            
-            if tf_installed:
-                print_success(f"TensorFlow {tf_version} is installed")
-            elif tf_macos_installed:
-                print_success(f"TensorFlow for Mac {tf_macos_version} is installed")
-            else:
-                print_warning("TensorFlow is not installed")
-            
-            # Check model packages
-            demucs_installed, demucs_version = check_package_installed("demucs")
-            spleeter_installed, spleeter_version = check_package_installed("spleeter")
-            bandsplit_installed, bandsplit_version = check_package_installed("band-split-rnn")
-            d3net_installed, d3net_version = check_package_installed("d3net")
-            
-            print("\nModel status:")
-            if demucs_installed:
-                print_success(f"Demucs {demucs_version} is installed")
-            else:
-                print_warning("Demucs is not installed")
-                
-            if spleeter_installed:
-                print_success(f"Spleeter {spleeter_version} is installed")
-            else:
-                print_warning("Spleeter is not installed")
-                
-            if bandsplit_installed:
-                print_success(f"Band-Split RNN {bandsplit_version} is installed")
-            else:
-                print_warning("Band-Split RNN is not installed")
-                
-            if d3net_installed:
-                print_success(f"D3Net {d3net_version} is installed")
-            else:
-                print_warning("D3Net is not installed")
-                
-        except Exception as e:
-            print_error(f"Error checking model dependencies: {e}")
-            
-        return 0
-    
-    # Install a specific model
-    if args.install_model:
-        # First ensure core dependencies
-        if not install_core_dependencies():
-            print_error("Failed to install core dependencies")
-            return 1
-            
-        model = args.install_model.lower()
-        
-        if model == "demucs":
-            if not install_demucs(version=4):
-                return 1
-        elif model == "demucs-v3":
-            if not install_demucs(version=3):
-                return 1
-        elif model == "spleeter":
-            if not install_spleeter():
-                return 1
-        elif model == "bandsplit":
-            if not install_bandsplit_rnn():
-                return 1
-        elif model == "d3net":
-            if not install_d3net():
-                return 1
-        elif model == "all":
-            print_header("Installing All Models")
-            install_demucs(version=4)
-            install_demucs(version=3)
-            install_spleeter()
-            install_bandsplit_rnn()
-            install_d3net()
-            print_success("Model installation completed")
-            
-        return 0
-    
+        return check_status()
+
     # Setup only
     if args.setup:
         return 0 if setup_environment() else 1
-    
+
+    # Everything below needs the core dependencies
+    if not install_core_dependencies():
+        return 1
+
+    if args.list_models:
+        list_models()
+        return 0
+
+    # Install or remove a model family
+    if args.uninstall_model:
+        return 0 if uninstall_model(args.uninstall_model) else 1
+
+    if args.install_model:
+        return 0 if install_model(args.install_model) else 1
+
+    if args.separate:
+        return separate_files(args)
+
     # Run application (default)
-    if not setup_environment():
-        print_warning("Environment setup incomplete, but attempting to run application...")
-    
+    check_python_compatibility()
+    check_ffmpeg()
     return run_application()
 
 if __name__ == "__main__":
-    sys.exit(main()) 
+    sys.exit(main())

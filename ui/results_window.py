@@ -1,312 +1,412 @@
+import html
 import os
-import tempfile
-import shutil
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QScrollArea, QWidget,
-    QLabel, QPushButton, QFileDialog, QGridLayout,
-    QFrame, QProgressBar, QSizePolicy, QSlider
+    QLabel, QPushButton, QFileDialog, QFrame, QSlider, QComboBox,
+    QMessageBox
 )
-from PyQt6.QtCore import Qt, QUrl, QTimer, QSize, pyqtSignal
-from PyQt6.QtGui import QPainter, QColor, QPen
+from PyQt6.QtCore import Qt, QThreadPool, QUrl, pyqtSignal
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 
-import numpy as np
-import soundfile as sf
-import librosa
-import librosa.display
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from core import ffmpeg, paths, pipeline
+from core.audio import format_time
+from ui.waveform import WaveformView
+from ui.workers import FunctionWorker
+
+STEM_TITLES = {
+    "no_vocals": "Instrumental (no vocals)",
+    "accompaniment": "Accompaniment",
+}
 
 
-class WaveformWidget(QFrame):
-    """Custom widget to display and play audio waveforms."""
-    
-    playback_position_changed = pyqtSignal(int)
-    
-    def __init__(self, audio_file, stem_name, parent=None):
+def stem_title(stem):
+    """Name of a stem as shown to the user."""
+    return STEM_TITLES.get(stem, stem.replace("_", " ").capitalize())
+
+
+class StemRow(QFrame):
+    """One audio track of the results: title, waveform, play and save buttons."""
+
+    play_clicked = pyqtSignal(object)
+    seek_requested = pyqtSignal(object, float)
+    save_clicked = pyqtSignal(object)
+
+    def __init__(self, audio_file, title, stem=None, parent=None):
         super().__init__(parent)
-        self.audio_file = audio_file
-        self.stem_name = stem_name
-        self.waveform_data = None
-        self.player = QMediaPlayer()
-        self.audio_output = QAudioOutput()
-        self.player.setAudioOutput(self.audio_output)
-        self.player.positionChanged.connect(self.update_position)
-        self.player.durationChanged.connect(self.update_duration)
-        self.is_playing = False
-        self.duration = 0
-        self.current_position = 0
-        
+        self.audio_file = str(audio_file)
+        self.title = title
+        # Name of the stem, or None for the original mix
+        self.stem = stem
+
         self.setFrameShape(QFrame.Shape.StyledPanel)
-        self.setFrameShadow(QFrame.Shadow.Raised)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.setMinimumHeight(200)
-        
-        self.init_ui()
-        self.load_audio()
-    
-    def init_ui(self):
+
         layout = QVBoxLayout(self)
-        
-        # Title
-        title_layout = QHBoxLayout()
-        title = QLabel(f"<b>{self.stem_name.capitalize()}</b>")
-        title.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        title_layout.addWidget(title)
-        
-        # Save button
-        self.save_button = QPushButton("Save")
-        self.save_button.setMaximumWidth(80)
-        self.save_button.clicked.connect(self.save_audio)
-        title_layout.addWidget(self.save_button)
-        
-        layout.addLayout(title_layout)
-        
+        layout.setContentsMargins(10, 8, 10, 8)
+
+        # Title and buttons
+        header_layout = QHBoxLayout()
+        title_label = QLabel(f"<b>{html.escape(title)}</b>")
+        header_layout.addWidget(title_label)
+        header_layout.addStretch()
+
+        self.play_button = QPushButton("▶ Play")
+        self.play_button.setMinimumWidth(90)
+        self.play_button.clicked.connect(lambda: self.play_clicked.emit(self))
+        header_layout.addWidget(self.play_button)
+
+        if stem is not None:
+            self.save_button = QPushButton("Save...")
+            self.save_button.clicked.connect(lambda: self.save_clicked.emit(self))
+            header_layout.addWidget(self.save_button)
+
+        layout.addLayout(header_layout)
+
         # Waveform visualization
-        self.figure = plt.figure(figsize=(7, 2))
-        self.canvas = FigureCanvas(self.figure)
-        self.canvas.setMinimumHeight(80)
-        layout.addWidget(self.canvas)
-        
-        # Playback controls
-        controls_layout = QHBoxLayout()
-        
-        self.play_button = QPushButton("▶️ Play")
-        self.play_button.clicked.connect(self.toggle_playback)
-        self.play_button.setMaximumWidth(100)
-        controls_layout.addWidget(self.play_button)
-        
-        self.playback_slider = QSlider(Qt.Orientation.Horizontal)
-        self.playback_slider.setMinimum(0)
-        self.playback_slider.setMaximum(1000)  # Will be updated when audio is loaded
-        self.playback_slider.sliderMoved.connect(self.seek)
-        controls_layout.addWidget(self.playback_slider)
-        
-        self.time_label = QLabel("0:00 / 0:00")
-        self.time_label.setMinimumWidth(100)
-        self.time_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-        controls_layout.addWidget(self.time_label)
-        
-        layout.addLayout(controls_layout)
-    
-    def load_audio(self):
-        """Load audio and display waveform."""
-        try:
-            # Load audio file
-            y, sr = librosa.load(self.audio_file, sr=None)
-            self.waveform_data = y
-            
-            # Set player source
-            self.player.setSource(QUrl.fromLocalFile(self.audio_file))
-            
-            # Plot waveform
-            self.figure.clear()
-            ax = self.figure.add_subplot(111)
-            ax.plot(np.linspace(0, len(y)/sr, len(y)), y, linewidth=0.5, color='#2a82da')
-            ax.set_axis_off()
-            ax.set_ylim(-1, 1)
-            self.figure.tight_layout(pad=0)
-            self.canvas.draw()
-            
-            # Display audio information
-            duration_sec = librosa.get_duration(y=y, sr=sr)
-            minutes = int(duration_sec // 60)
-            seconds = int(duration_sec % 60)
-            self.time_label.setText(f"0:00 / {minutes}:{seconds:02d}")
-            
-        except Exception as e:
-            print(f"Error loading audio file {self.audio_file}: {e}")
-    
-    def toggle_playback(self):
-        """Toggle play/pause playback."""
-        if self.is_playing:
-            self.player.pause()
-            self.play_button.setText("▶️ Play")
-        else:
-            self.player.play()
-            self.play_button.setText("⏸️ Pause")
-        
-        self.is_playing = not self.is_playing
-    
-    def update_position(self, position):
-        """Update slider position and time display during playback."""
-        self.current_position = position
-        
-        # Update slider
-        if self.duration > 0:
-            self.playback_slider.setValue(int(position * 1000 / self.duration))
-            
-        # Update time display
-        position_sec = position / 1000
-        minutes = int(position_sec // 60)
-        seconds = int(position_sec % 60)
-        
-        duration_sec = self.duration / 1000
-        dur_minutes = int(duration_sec // 60)
-        dur_seconds = int(duration_sec % 60)
-        
-        self.time_label.setText(f"{minutes}:{seconds:02d} / {dur_minutes}:{dur_seconds:02d}")
-        
-        # Reset button state when playback finishes
-        if position >= self.duration and self.duration > 0:
-            self.is_playing = False
-            self.play_button.setText("▶️ Play")
-            self.player.setPosition(0)
-    
-    def update_duration(self, duration):
-        """Update total duration when media loads."""
-        self.duration = duration
-    
-    def seek(self, position):
-        """Seek to a position in the audio file."""
-        if self.duration > 0:
-            new_pos = int(position * self.duration / 1000)
-            self.player.setPosition(new_pos)
-    
-    def save_audio(self):
-        """Save the audio file to a user-selected location."""
-        default_filename = os.path.basename(self.audio_file)
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "Save Audio File", default_filename, "Audio Files (*.wav);;All Files (*.*)"
-        )
-        
-        if file_path:
-            try:
-                # Copy the audio file to the selected location
-                shutil.copy2(self.audio_file, file_path)
-                print(f"File saved to: {file_path}")
-            except Exception as e:
-                print(f"Error saving file: {e}")
-    
-    def stop_playback(self):
-        """Stop audio playback."""
-        if self.is_playing:
-            self.player.stop()
-            self.is_playing = False
-            self.play_button.setText("▶️ Play")
+        self.waveform = WaveformView(self.audio_file)
+        self.waveform.seek_requested.connect(lambda fraction: self.seek_requested.emit(self, fraction))
+        layout.addWidget(self.waveform)
+
+    def set_state(self, active, playing):
+        """Update the row for the current playback state."""
+        self.waveform.set_active(active)
+        self.play_button.setText("‖ Pause" if (active and playing) else "▶ Play")
 
 
 class ResultsWindow(QDialog):
     """Window to display processed audio stems with waveform visualization and playback."""
-    
-    def __init__(self, parent=None, source_dir=None, source_audio=None, model_name=None):
+
+    def __init__(self, parent, result, settings):
+        """
+        Args:
+            parent: Parent widget
+            result: The pipeline.SeparationResult to show
+            settings: The application Settings
+        """
         super().__init__(parent)
-        self.source_dir = source_dir
-        self.source_audio = source_audio  # Original audio file
-        self.model_name = model_name
-        self.temp_dir = None
-        self.waveform_widgets = []
-        
-        # Create a temporary directory to store all results
-        self.temp_dir = tempfile.mkdtemp(prefix="captainstems_results_")
-        
-        # Copy all files from source_dir to temp_dir
-        if source_dir and os.path.exists(source_dir):
-            for file_name in os.listdir(source_dir):
-                if file_name.endswith(".wav") or file_name.endswith(".mp3"):
-                    src = os.path.join(source_dir, file_name)
-                    dst = os.path.join(self.temp_dir, file_name)
-                    shutil.copy2(src, dst)
-        
-        self.setWindowTitle(f"Audio Separation Results - {model_name}")
-        self.setMinimumSize(700, 500)
+        self.result = result
+        self.settings = settings
+        self.rows = []
+        self.current_row = None
+        self.pending_position = None
+        self.pending_play = False
+        self.switching_source = False
+        self.export_worker = None
+        self.saved_folder = None
+
+        # All tracks have the length of the mix
+        duration = ffmpeg.media_duration(result.mix) or 0
+        self.duration_ms = int(duration * 1000)
+
+        # One player shared by all rows, so switching stems keeps the position
+        self.player = QMediaPlayer(self)
+        self.audio_output = QAudioOutput(self)
+        self.player.setAudioOutput(self.audio_output)
+        self.player.positionChanged.connect(self.on_position_changed)
+        self.player.playbackStateChanged.connect(self.on_playback_state_changed)
+        self.player.mediaStatusChanged.connect(self.on_media_status_changed)
+        self.player.errorOccurred.connect(self.on_player_error)
+
+        self.setWindowTitle(f"{result.title} - {result.model_label}")
+        self.setMinimumSize(760, 560)
         self.init_ui()
-        
+
     def init_ui(self):
         """Initialize the UI components."""
         main_layout = QVBoxLayout(self)
-        
+
         # Title
-        title = QLabel(f"<h2>Audio Separation Results</h2>")
+        # File names may contain characters that mean something in HTML
+        title = QLabel(f"<h2>{html.escape(self.result.title)}</h2>")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setTextFormat(Qt.TextFormat.RichText)
         main_layout.addWidget(title)
-        
+
         # Model info
-        if self.model_name:
-            model_info = QLabel(f"<h3>Model: {self.model_name}</h3>")
-            model_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            main_layout.addWidget(model_info)
-        
+        model_info = QLabel(f"Model: {self.result.model_label}  ·  {len(self.result.stems)} stems")
+        model_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(model_info)
+
+        hint = QLabel("Click a waveform to jump there. Switching between tracks keeps the position.")
+        hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        hint.setEnabled(False)
+        main_layout.addWidget(hint)
+
         # Scroll area for waveforms
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
-        
-        # Load audio files from the temporary directory
-        audio_files = []
-        if self.temp_dir and os.path.exists(self.temp_dir):
-            for file_name in os.listdir(self.temp_dir):
-                if file_name.endswith((".wav", ".mp3")):
-                    file_path = os.path.join(self.temp_dir, file_name)
-                    # Get stem name from filename (remove extension)
-                    stem_name = os.path.splitext(file_name)[0]
-                    audio_files.append((file_path, stem_name))
-        
-        # Sort files by stem names (vocals first, then drums, bass, other)
-        stem_order = {"vocals": 0, "drums": 1, "bass": 2, "other": 3, "piano": 4, "guitar": 5}
-        audio_files.sort(key=lambda x: stem_order.get(x[1], 99))
-        
-        # Add waveform widgets for each audio file
-        for file_path, stem_name in audio_files:
-            waveform_widget = WaveformWidget(file_path, stem_name)
-            scroll_layout.addWidget(waveform_widget)
-            self.waveform_widgets.append(waveform_widget)
-        
+
+        # The original mix first, for comparison, then one row per stem
+        self.add_row(scroll_layout, StemRow(self.result.mix, "Original mix"))
+        for stem, path in self.result.stems.items():
+            self.add_row(scroll_layout, StemRow(path, stem_title(stem), stem))
+
         scroll_layout.addStretch()
         scroll_area.setWidget(scroll_content)
-        main_layout.addWidget(scroll_area)
-        
-        # Button layout
+        main_layout.addWidget(scroll_area, 1)
+
+        # Playback position and volume
+        playback_layout = QHBoxLayout()
+        self.time_label = QLabel()
+        self.time_label.setMinimumWidth(110)
+        playback_layout.addWidget(self.time_label)
+        playback_layout.addStretch()
+        playback_layout.addWidget(QLabel("Volume:"))
+        self.volume_slider = QSlider(Qt.Orientation.Horizontal)
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.setValue(80)
+        self.volume_slider.setFixedWidth(140)
+        self.volume_slider.valueChanged.connect(self.on_volume_changed)
+        playback_layout.addWidget(self.volume_slider)
+        main_layout.addLayout(playback_layout)
+        self.on_volume_changed(self.volume_slider.value())
+        self.update_time_label(0)
+
+        # Export controls
         button_layout = QHBoxLayout()
-        
-        self.save_all_button = QPushButton("Save All Files")
+
+        button_layout.addWidget(QLabel("Format:"))
+        self.format_combo = QComboBox()
+        for key, export_format in ffmpeg.EXPORT_FORMATS.items():
+            self.format_combo.addItem(export_format.label, key)
+        self.format_combo.setCurrentIndex(self.format_combo.findData(self.settings.export_format()))
+        self.format_combo.currentIndexChanged.connect(self.on_format_changed)
+        button_layout.addWidget(self.format_combo)
+
+        self.bitrate_combo = QComboBox()
+        for bitrate in ffmpeg.BITRATES:
+            self.bitrate_combo.addItem(bitrate.replace("k", " kbps"), bitrate)
+        self.bitrate_combo.setCurrentIndex(self.bitrate_combo.findData(self.settings.export_bitrate()))
+        self.bitrate_combo.currentIndexChanged.connect(self.on_format_changed)
+        button_layout.addWidget(self.bitrate_combo)
+
+        self.save_all_button = QPushButton("Save All Files...")
         self.save_all_button.clicked.connect(self.save_all_files)
         button_layout.addWidget(self.save_all_button)
-        
-        button_layout.addStretch()
-        
+
+        self.status_label = QLabel()
+        self.status_label.setTextFormat(Qt.TextFormat.PlainText)
+        button_layout.addWidget(self.status_label, 1)
+
+        self.open_folder_button = QPushButton("Open Folder")
+        self.open_folder_button.setVisible(False)
+        self.open_folder_button.clicked.connect(self.open_saved_folder)
+        button_layout.addWidget(self.open_folder_button)
+
         self.close_button = QPushButton("Close")
-        self.close_button.clicked.connect(self.close_window)
+        self.close_button.clicked.connect(self.reject)
         button_layout.addWidget(self.close_button)
-        
+
         main_layout.addLayout(button_layout)
-    
-    def save_all_files(self):
-        """Save all audio files to a user-selected directory."""
-        dir_path = QFileDialog.getExistingDirectory(
-            self, "Select Directory to Save All Files"
+        self.on_format_changed()
+
+    def add_row(self, layout, row):
+        row.play_clicked.connect(self.toggle_playback)
+        row.seek_requested.connect(self.seek)
+        row.save_clicked.connect(self.save_stem)
+        layout.addWidget(row)
+        self.rows.append(row)
+
+    # Playback ---------------------------------------------------------------
+
+    def toggle_playback(self, row):
+        """Play or pause a row. Another row continues from the current position."""
+        if row is self.current_row:
+            if self.pending_position is not None:
+                # Still loading: decide what happens once the file is ready
+                self.pending_play = not self.pending_play
+                self.update_rows()
+            elif self.is_playing():
+                self.player.pause()
+            else:
+                self.player.play()
+        else:
+            self.switch_to(row, self.current_position(), play=True)
+
+    def current_position(self):
+        """Playback position in milliseconds, also while a file is still loading."""
+        if self.pending_position is not None:
+            return self.pending_position
+        return self.player.position() if self.current_row else 0
+
+    def seek(self, row, fraction):
+        """Jump to a position (0.0 to 1.0) in a row."""
+        position = int(fraction * self.duration_ms)
+        if row is self.current_row:
+            if self.pending_position is not None:
+                # Still loading: applied as soon as the file is ready
+                self.pending_position = position
+            else:
+                self.player.setPosition(position)
+            self.on_position_changed(position)
+        else:
+            self.switch_to(row, position, play=self.is_playing() or self.current_row is None)
+
+    def is_playing(self):
+        """Whether audio is playing, or about to once the file has been loaded."""
+        if self.pending_position is not None:
+            return self.pending_play
+        return self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
+
+    def switch_to(self, row, position, play):
+        """Make a row the one that is played, starting at the given position."""
+        self.current_row = row
+        # The position can only be set once the new file has been loaded
+        self.pending_position = position
+        self.pending_play = play
+        # Replacing the source first reports the previous file as loaded once
+        # more; only the notifications after setSource() are about the new one
+        self.switching_source = True
+        self.player.setSource(QUrl.fromLocalFile(row.audio_file))
+        self.switching_source = False
+        self.update_rows()
+        self.on_position_changed(position)
+
+    def on_media_status_changed(self, status):
+        if self.switching_source:
+            return
+        if status in (QMediaPlayer.MediaStatus.LoadedMedia, QMediaPlayer.MediaStatus.BufferedMedia):
+            if self.pending_position is not None:
+                position, play = self.pending_position, self.pending_play
+                self.pending_position = None
+                if position:
+                    self.player.setPosition(position)
+                if play:
+                    self.player.play()
+        elif status == QMediaPlayer.MediaStatus.EndOfMedia:
+            # Rewind when the end is reached
+            self.player.stop()
+            self.player.setPosition(0)
+            self.on_position_changed(0)
+
+    def on_position_changed(self, position):
+        if self.pending_position is not None:
+            # Still loading: show where playback is going to continue
+            position = self.pending_position
+        fraction = position / self.duration_ms if self.duration_ms else 0.0
+        for row in self.rows:
+            row.waveform.set_position(fraction)
+        self.update_time_label(position)
+
+    def on_playback_state_changed(self, state):
+        self.update_rows()
+
+    def on_player_error(self, error, message):
+        if error != QMediaPlayer.Error.NoError:
+            self.status_label.setText(f"Playback error: {message}")
+
+    def on_volume_changed(self, value):
+        self.audio_output.setVolume(value / 100.0)
+
+    def update_rows(self):
+        playing = self.is_playing()
+        for row in self.rows:
+            row.set_state(row is self.current_row, playing)
+
+    def update_time_label(self, position):
+        self.time_label.setText(f"{format_time(position / 1000)} / {format_time(self.duration_ms / 1000)}")
+
+    def stop_playback(self):
+        """Stop audio playback and release the audio file."""
+        self.player.stop()
+        self.player.setSource(QUrl())
+
+    # Saving -----------------------------------------------------------------
+
+    def export_choice(self):
+        """The (format key, bitrate) selected for saving."""
+        return self.format_combo.currentData(), self.bitrate_combo.currentData()
+
+    def on_format_changed(self):
+        fmt, bitrate = self.export_choice()
+        self.bitrate_combo.setVisible(ffmpeg.EXPORT_FORMATS[fmt].lossy)
+        # Remember the choice for next time
+        self.settings.set("export_format", fmt)
+        self.settings.set("export_bitrate", bitrate)
+
+    def start_directory(self):
+        last = self.settings.get("last_save_dir")
+        return last if last and os.path.isdir(last) else os.path.dirname(str(self.result.source))
+
+    def save_stem(self, row):
+        """Save one stem to a user-selected location."""
+        fmt, bitrate = self.export_choice()
+        export_format = ffmpeg.EXPORT_FORMATS[fmt]
+        default_name = paths.safe_name(f"{self.result.title} - {row.stem}") + export_format.extension
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Save Audio File", os.path.join(self.start_directory(), default_name),
+            f"{export_format.label} (*{export_format.extension})"
         )
-        
-        if dir_path:
-            try:
-                for file_name in os.listdir(self.temp_dir):
-                    if file_name.endswith((".wav", ".mp3")):
-                        src = os.path.join(self.temp_dir, file_name)
-                        dst = os.path.join(dir_path, file_name)
-                        shutil.copy2(src, dst)
-                
-                print(f"All files saved to: {dir_path}")
-            except Exception as e:
-                print(f"Error saving files: {e}")
-    
-    def close_window(self):
-        """Close the dialog and clean up."""
-        # Stop any ongoing playback
-        for widget in self.waveform_widgets:
-            widget.stop_playback()
-        
-        self.accept()
-    
-    def closeEvent(self, event):
-        """Handle window close event."""
-        # Stop any ongoing playback
-        for widget in self.waveform_widgets:
-            widget.stop_playback()
-        
-        # Don't delete temp files when debugging
-        # if self.temp_dir and os.path.exists(self.temp_dir):
-        #    shutil.rmtree(self.temp_dir)
-        
-        event.accept() 
+        if not file_path:
+            return
+        self.settings.set("last_save_dir", os.path.dirname(file_path))
+        self.run_export(
+            lambda: ffmpeg.export_audio(row.audio_file, file_path, fmt, bitrate),
+            f"Saving {row.title.lower()}..."
+        )
+
+    def save_all_files(self):
+        """Save all stems to a user-selected directory."""
+        dir_path = QFileDialog.getExistingDirectory(
+            self, "Select Directory to Save All Files", self.start_directory()
+        )
+        if not dir_path:
+            return
+        self.settings.set("last_save_dir", dir_path)
+        fmt, bitrate = self.export_choice()
+        self.run_export(
+            lambda: pipeline.export_result(self.result, dir_path, fmt, bitrate),
+            "Saving all stems..."
+        )
+
+    def run_export(self, function, message):
+        """Run an export in the background, keeping the window responsive."""
+        if self.export_worker is not None:
+            return
+        self.set_export_enabled(False)
+        self.open_folder_button.setVisible(False)
+        self.status_label.setText(message)
+        self.export_worker = FunctionWorker(function, self)
+        self.export_worker.succeeded.connect(self.on_export_succeeded)
+        self.export_worker.failed.connect(self.on_export_failed)
+        self.export_worker.finished.connect(self.on_export_done)
+        self.export_worker.start()
+
+    def on_export_succeeded(self, saved_path):
+        saved_path = str(saved_path)
+        self.saved_folder = saved_path if os.path.isdir(saved_path) else os.path.dirname(saved_path)
+        self.status_label.setText(f"Saved to {saved_path}")
+        self.status_label.setToolTip(saved_path)
+        self.open_folder_button.setVisible(True)
+
+    def on_export_failed(self, message):
+        self.status_label.setText("Saving failed")
+        QMessageBox.critical(self, "Saving Failed", f"The audio could not be saved:\n{message}")
+
+    def on_export_done(self):
+        self.export_worker = None
+        self.set_export_enabled(True)
+
+    def set_export_enabled(self, enabled):
+        self.save_all_button.setEnabled(enabled)
+        for row in self.rows:
+            if row.stem is not None:
+                row.save_button.setEnabled(enabled)
+
+    def open_saved_folder(self):
+        if self.saved_folder:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(self.saved_folder))
+
+    def done(self, result):
+        """Called however the window is closed (button, Escape or title bar)."""
+        # Let a running export finish so no half-written file is left behind
+        if self.export_worker is not None:
+            self.export_worker.wait()
+        self.stop_playback()
+        # Waveforms still being read keep their files open, which would
+        # prevent deleting the working files
+        QThreadPool.globalInstance().waitForDone(5000)
+        super().done(result)
