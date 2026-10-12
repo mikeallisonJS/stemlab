@@ -152,14 +152,29 @@ class NodePlan:
     keep: str | None = None
     #: Outputs other nodes may read
     outputs: list[str] = field(default_factory=list)
+    #: Anything else the result depends on, such as the content of a reference file
+    key_extra: dict = field(default_factory=dict)
     key: str = ""
 
 
-def resolve_params(backend, registered, recipe_defaults: dict, node_params: dict, node_name: str) -> dict:
+def resolve_params(
+    backend,
+    registered,
+    recipe_defaults: dict,
+    node_params: dict,
+    node_name: str,
+    default_use: dict[str, dict] | None = None,
+) -> dict:
     """
     Merge the layers of inference parameters, lowest priority first:
     backend defaults, device defaults, the model's config, the manifest's
     `defaults`, the recipe's `defaults`, then the node's own `params`.
+
+    The recipe's defaults are shared by nodes on different backends, where a
+    knob of the same name can mean different things (`overlap` is a count of
+    chunks for msst and a fraction for demucs). A default that does not fit
+    this node's backend is therefore skipped here; `default_use` collects
+    where each one was applied so the caller can reject one that fits nowhere.
     """
     specs = backend.supported_params
     manifest_defaults = registered.manifest.defaults
@@ -171,12 +186,11 @@ def resolve_params(backend, registered, recipe_defaults: dict, node_params: dict
     except (RuntimeError, ValueError) as e:
         raise RecipeError(f"node '{node_name}': {e}") from None
 
-    # Shared layers may carry knobs another backend understands; those are skipped here
+    # Knobs this backend does not have are skipped: the layers also serve other backends
     layers = [
         ("device defaults", backend.device_defaults(resolved_device, device.vram_mb())),
         ("the model's config", backend.model_defaults(registered)),
         (f"the manifest of '{registered.id}'", manifest_defaults),
-        ("the recipe's defaults", recipe_defaults),
     ]
     for origin, layer in layers:
         for name, value in layer.items():
@@ -185,6 +199,20 @@ def resolve_params(backend, registered, recipe_defaults: dict, node_params: dict
                     params[name] = specs[name].coerce(name, value)
                 except ValueError as e:
                     raise RecipeError(f"node '{node_name}': {e} (from {origin})") from None
+
+    for name, value in recipe_defaults.items():
+        if name not in specs:
+            continue
+        use = default_use.setdefault(name, {"applied": [], "errors": []}) if default_use is not None else None
+        try:
+            params[name] = specs[name].coerce(name, value)
+        except ValueError as e:
+            if use is None:
+                raise RecipeError(f"node '{node_name}': {e} (from the recipe's defaults)") from None
+            use["errors"].append(f"node '{node_name}' ({backend.name}): {e}")
+        else:
+            if use is not None:
+                use["applied"].append(node_name)
 
     for name, value in node_params.items():
         if name not in specs:
@@ -209,6 +237,7 @@ def plan_recipe(recipe: Recipe, registry: Registry) -> dict[str, NodePlan]:
     Raises RecipeError with a message naming the node at fault.
     """
     plans: dict[str, NodePlan] = {}
+    default_use: dict[str, dict] = {}
     for name in recipe.order():
         node = recipe.nodes[name]
         plan = NodePlan(name=name, op=node.op, node=node)
@@ -221,7 +250,7 @@ def plan_recipe(recipe: Recipe, registry: Registry) -> dict[str, NodePlan]:
             manifest = registered.manifest
             try:
                 backend = base.get_backend(manifest.backend)
-                plan.params = resolve_params(backend, registered, recipe.defaults, node.params, name)
+                plan.params = resolve_params(backend, registered, recipe.defaults, node.params, name, default_use)
                 plan.model_sha256 = registered.sha256()
             except RecipeError:
                 raise
@@ -257,6 +286,11 @@ def plan_recipe(recipe: Recipe, registry: Registry) -> dict[str, NodePlan]:
                     f"node '{name}' reads '{reference}', but '{source}' only emits {plans[source].outputs}"
                 )
         plans[name] = plan
+
+    # A default may be skipped by backends it does not fit, but it has to fit at least one node
+    for name, use in default_use.items():
+        if use["errors"] and not use["applied"]:
+            raise RecipeError(f"defaults.{name} fits no node: " + "; ".join(use["errors"]))
     return plans
 
 
@@ -283,6 +317,7 @@ def assign_keys(plans: dict[str, NodePlan], mix_key: str) -> None:
                 "model": plan.model_sha256,
                 "keep": plan.keep,
                 "inputs": inputs,
+                "extra": plan.key_extra,
             }
         )
 
@@ -375,8 +410,27 @@ class RunContext:
         return candidate if candidate.is_absolute() else self.input_path.parent / candidate
 
 
-def default_output_dir(input_path: Path, recipe: Recipe) -> Path:
-    return input_path.parent / export.safe_name(f"{input_path.stem} [{recipe.name}]")
+def default_output_dir(input_path: Path, recipe: Recipe, parent: Path | None = None) -> Path:
+    """
+    `<parent>/<track> [<recipe>]`, next to the input by default.
+
+    Two different files can share a name ("song.wav" in two folders, or next
+    to "song.flac"). A folder already holding the run of another input is
+    left alone and a numbered one is used instead; running the same file
+    again replaces its own earlier results.
+    """
+    base = Path(parent) if parent else input_path.parent
+    name = export.safe_name(f"{input_path.stem} [{recipe.name}]")
+    number = 1
+    while True:
+        candidate = base / (name if number == 1 else f"{name} ({number})")
+        try:
+            previous = json.loads((candidate / "run.json").read_text(encoding="utf-8"))["input"]["path"]
+        except (OSError, ValueError, KeyError, TypeError):
+            return candidate
+        if os.path.normcase(previous) == os.path.normcase(str(input_path.resolve())):
+            return candidate
+        number += 1
 
 
 def _now() -> str:
@@ -394,6 +448,7 @@ def run_recipe(
     use_cache: bool = True,
     cache: Cache | None = None,
     on_mix: Callable[[str], None] | None = None,
+    out_parent: str | os.PathLike | None = None,
 ) -> dict:
     """
     Run a recipe on one audio file.
@@ -401,7 +456,9 @@ def run_recipe(
     Args:
         recipe: The validated recipe
         input_path: The audio file; it is the implicit `mix` node
-        out_dir: Where exported files and run.json go; next to the input by default
+        out_dir: Where exported files and run.json go. When omitted, a folder named
+                 after the track and the recipe is used, below `out_parent`
+        out_parent: Where that folder is created; next to the input by default
         registry: Installed models (the default registry when omitted)
         events: Called with a dict for every step: run_started, node_started,
                 node_status, node_progress, node_finished, warning, run_finished,
@@ -434,9 +491,20 @@ def run_recipe(
     mix = audio.to_channels(mix, 2)
     input_sha256 = audio.file_sha256(input_path)
     mix_key = _digest({"v": CACHE_VERSION, "file": input_sha256, "sample_rate": sample_rate, "channels": 2})
+    for plan in plans.values():
+        reference = getattr(plan.node.params, "reference", None) if plan.op == "analyze" else None
+        if reference:
+            candidate = Path(reference).expanduser()
+            resolved = candidate if candidate.is_absolute() else input_path.parent / candidate
+            if not resolved.is_file():
+                raise RecipeError(f"node '{plan.name}': reference file not found: {resolved}")
+            # The score depends on what is in the file, not on what it is called
+            plan.key_extra = {"reference_sha256": audio.file_sha256(resolved)}
     assign_keys(plans, mix_key)
 
-    out_dir = Path(out_dir) if out_dir else default_output_dir(input_path, recipe)
+    out_dir = (
+        Path(out_dir) if out_dir else default_output_dir(input_path, recipe, Path(out_parent) if out_parent else None)
+    )
     staging = out_dir / f".staging-{run_id}"
     record: dict = {
         "captainstems": __version__,

@@ -13,7 +13,7 @@
         "other",
         "vocals"
       ],
-      "license": "MIT (code); weights trained on MUSDB-HQ plus internal data",
+      "license": "MIT (Demucs repository)",
       "notes": "Hybrid Transformer Demucs, the 4 stem default",
       "sample_rate": 44100,
       "files": [
@@ -49,7 +49,7 @@
         "other",
         "vocals"
       ],
-      "license": "MIT (code)",
+      "license": "MIT (Demucs repository)",
       "notes": "One fine-tuned network per stem; 4x the time of htdemucs",
       "sample_rate": 44100,
       "files": [
@@ -100,7 +100,7 @@
         "guitar",
         "piano"
       ],
-      "license": "MIT (code)",
+      "license": "MIT (Demucs repository)",
       "notes": "Adds guitar and piano; the piano stem is the weakest",
       "sample_rate": 44100,
       "files": [
@@ -125,7 +125,7 @@
       "arch": "mel_band_roformer",
       "config": "config.yaml",
       "weights": "model.ckpt",
-      "license": "GPL-3.0 as published by the author",
+      "license": "MIT (as published on Hugging Face)",
       "notes": "KimberleyJensen's vocal model; SDR 10.98 on the MSST leaderboard. A good default for vocals",
       "defaults": {
         "overlap": 4
@@ -156,7 +156,7 @@
       "arch": "bs_roformer",
       "config": "config.yaml",
       "weights": "model.ckpt",
-      "license": "not stated by the author",
+      "license": "not stated (hosted in UVR's model repository, which has no license file)",
       "notes": "viperx's ep_317 checkpoint, SDR 12.97 on vocals in UVR's ranking",
       "stems": [
         "vocals"
@@ -184,7 +184,7 @@
       "arch": "mel_band_roformer",
       "config": "config.yaml",
       "weights": "model.ckpt",
-      "license": "GPL-3.0 as published by the author",
+      "license": "GPL-3.0 (as published on Hugging Face)",
       "notes": "Removes reverb from a vocal stem; SDR 19.17",
       "stems": [
         "noreverb"
@@ -212,7 +212,7 @@
       "arch": "scnet",
       "config": "config.yaml",
       "weights": "model.ckpt",
-      "license": "MIT (MSST release)",
+      "license": "not stated (distributed in the releases of the MIT-licensed MSST repository)",
       "notes": "4 stem SCNet; strong drums (SDR 11.15 on MUSDB)",
       "stems": [
         "drums",
@@ -245,7 +245,7 @@
       "stems": [
         "instrumental"
       ],
-      "license": "MIT (UVR model repository)",
+      "license": "not stated (hosted in UVR's model repository, which has no license file)",
       "notes": "Instrumental model from Ultimate Vocal Remover; subtract it from the mix for vocals",
       "onnx_params": {
         "dim_f": 3072,
@@ -272,7 +272,7 @@
       "stems": [
         "vocals"
       ],
-      "license": "MIT (UVR model repository)",
+      "license": "not stated (hosted in UVR's model repository, which has no license file)",
       "notes": "KimberleyJensen's MDX-Net vocal model; light enough for CPUs and any GPU",
       "onnx_params": {
         "dim_f": 3072,

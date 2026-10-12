@@ -101,7 +101,12 @@ class MsstModel(Model):
         if generic:
             fade_size = chunk_size // 10
             border = chunk_size - step
-            windowing = self._windowing(chunk_size, fade_size)
+            if border == 0:
+                # overlap 1: chunks only touch, so fading their edges would mute the seams
+                fade_size = 0
+                windowing = torch.ones(chunk_size)
+            else:
+                windowing = self._windowing(chunk_size, fade_size)
             # Reflect padding keeps the first and last seconds out of the fades
             if length > 2 * border and border > 0:
                 mix = nn.functional.pad(mix, (border, border), mode="reflect")
@@ -139,9 +144,9 @@ class MsstModel(Model):
 
                     if generic:
                         window = windowing.clone()
-                        if position - step == 0:
+                        if fade_size and position - step == 0:
                             window[:fade_size] = 1  # first chunk: no fade in
-                        elif position >= total:
+                        elif fade_size and position >= total:
                             window[-fade_size:] = 1  # last chunk: no fade out
                     for index, (start, seg_length) in enumerate(locations):
                         if generic:

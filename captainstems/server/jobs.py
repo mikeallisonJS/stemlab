@@ -28,11 +28,20 @@ ACTIVE = (QUEUED, RUNNING)
 class Job:
     """One recipe run on one input file."""
 
-    def __init__(self, recipe: Recipe, input_path: Path, out_dir: Path | None, use_cache: bool):
+    def __init__(
+        self,
+        recipe: Recipe,
+        input_path: Path,
+        out_dir: Path | None,
+        use_cache: bool,
+        out_parent: Path | None = None,
+    ):
         self.id = uuid.uuid4().hex[:12]
         self.recipe = recipe
         self.input_path = input_path
         self.out_dir = out_dir
+        #: Without an explicit folder, the run creates one below this (next to the input when None)
+        self.out_parent = out_parent
         self.use_cache = use_cache
         self.status = QUEUED
         self.created = time.time()
@@ -154,8 +163,15 @@ class JobManager:
         self._thread = threading.Thread(target=self._work, name="captainstems-jobs", daemon=True)
         self._thread.start()
 
-    def submit(self, recipe: Recipe, input_path: Path, out_dir: Path | None = None, use_cache: bool = True) -> Job:
-        job = Job(recipe, input_path, out_dir, use_cache)
+    def submit(
+        self,
+        recipe: Recipe,
+        input_path: Path,
+        out_dir: Path | None = None,
+        use_cache: bool = True,
+        out_parent: Path | None = None,
+    ) -> Job:
+        job = Job(recipe, input_path, out_dir, use_cache, out_parent)
         with self._condition:
             self.jobs[job.id] = job
             self._queue.append(job)
@@ -201,12 +217,18 @@ class JobManager:
         job.cancel.set()
         with self._condition:
             if job in self._queue:
-                # Never started: nothing will report its end, so do it here
+                # Never started: nothing else will report its end
                 self._queue.remove(job)
-                job.status = CANCELLED
-                job.finished = time.time()
-                job.publish({"type": "run_cancelled"})
+                self._finish_cancelled(job)
         return True
+
+    @staticmethod
+    def _finish_cancelled(job: Job) -> None:
+        """End a job that was cancelled before it ran. Followers wait for `job_done`."""
+        job.status = CANCELLED
+        job.finished = time.time()
+        job.publish({"type": "run_cancelled"})
+        job.publish({"type": "job_done", "status": CANCELLED})
 
     def remove(self, job_id: str) -> bool:
         """Forget a job that is no longer running."""
@@ -241,6 +263,9 @@ class JobManager:
 
     def _run(self, job: Job) -> None:
         if job.cancel.is_set():
+            # Cancelled in the moment between leaving the queue and starting
+            if not job.done:
+                self._finish_cancelled(job)
             return
         job.status = RUNNING
         job.started = time.time()
@@ -262,6 +287,7 @@ class JobManager:
                 cancel=job.cancel,
                 use_cache=job.use_cache,
                 on_mix=lambda path: setattr(job, "mix_file", path),
+                out_parent=job.out_parent,
             )
             job.status = FINISHED
         except Cancelled:

@@ -533,9 +533,20 @@ function RecipePanel({ recipe, setRecipe, schema, selectedMix }: {
 }) {
   // Defaults apply across backends, so offer every knob any backend has
   const merged: JsonSchema = { type: "object", properties: {} };
-  for (const backend of Object.values(schema.backends)) {
+  const fields = merged.properties as Record<string, JsonSchema>;
+  for (const [backendName, backend] of Object.entries(schema.backends)) {
     for (const [name, field] of Object.entries(backend.properties ?? {})) {
-      if (!(name in (merged.properties as object))) (merged.properties as Record<string, JsonSchema>)[name] = { ...field, default: undefined };
+      const known = fields[name];
+      if (!known) {
+        fields[name] = { ...field, default: undefined, title: backendName };
+      } else if (known.type !== field.type || known.minimum !== field.minimum || known.maximum !== field.maximum) {
+        // The same name means different things per backend (overlap: a chunk count for msst,
+        // a fraction for demucs and onnx). Take any number; each node uses it only if it fits.
+        fields[name] = {
+          type: "number",
+          description: `Differs per backend. ${known.title}: ${known.description} / ${backendName}: ${field.description}. A node only takes the value if it fits its backend.`,
+        };
+      }
     }
   }
   return (

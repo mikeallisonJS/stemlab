@@ -141,3 +141,37 @@ nodes:
     assert params["device"] in ("cuda", "dml", "coreml", "cpu")
     assert record["backends"]["onnx"]["onnxruntime"]
     stems_add_up(tmp_path / "out", ["vocals", "inst"], clip, tolerance_db=-90.0)
+
+
+@pytest.mark.parametrize("overlap, batch_size", [(1, 1), (1, 3), (2, 1), (4, 2)])
+def test_msst_overlap_add_has_no_gaps(overlap, batch_size):
+    """An identity network must hand back its input, also when chunks only touch (overlap 1)."""
+    from captainstems.backends.msst import MsstModel, _import_upstream
+
+    _, _, windowing = _import_upstream()
+    model = MsstModel(lambda batch: batch.unsqueeze(1), {}, "scnet", "cpu", ["same"], 44100, windowing)
+    signal = np.ones((2, 44100 * 3 + 1234), dtype=np.float32)
+    out = model._demix(torch.from_numpy(signal), 44100, overlap, batch_size, False, lambda fraction: None, None)
+    assert out.shape == (1, 2, signal.shape[1])
+    assert np.allclose(out, 1.0, atol=1e-5), f"dropouts at {np.flatnonzero(np.abs(out[0, 0] - 1) > 1e-5)[:6]}"
+
+
+def test_demucs_runs_are_repeatable(real_home, clip, tmp_path):
+    """Demucs shifts the audio by a random amount; the seed in run.json pins it down."""
+    registry = model(real_home, "htdemucs")
+    text = """
+nodes:
+  split: {op: separate, model: htdemucs, targets: [vocals], params: {device: cpu, seed: SEED}}
+  out: {op: export, inputs: [split.vocals], params: {format: wav, bit_depth: 32}}
+"""
+
+    def vocals(seed, folder):
+        record = runner.run_recipe(
+            recipe.loads(text.replace("SEED", str(seed))), clip, tmp_path / folder, registry=registry, use_cache=False
+        )
+        assert record["nodes"]["split"]["params"]["seed"] == seed
+        return sf.read(str(tmp_path / folder / "clip-5s_vocals.wav"), dtype="float32")[0]
+
+    first, second, other = vocals(0, "a"), vocals(0, "b"), vocals(7, "c")
+    assert np.array_equal(first, second), "the same seed must give the same samples"
+    assert not np.array_equal(first, other), "another seed shifts differently"

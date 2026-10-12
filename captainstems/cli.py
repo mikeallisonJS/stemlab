@@ -159,11 +159,17 @@ def run(
     registry = Registry()
     failures = 0
     for input_path in inputs:
-        out_dir = None
-        if out is not None:
-            out_dir = out if len(inputs) == 1 else out / runner.default_output_dir(input_path, recipe).name
+        # One input: --out is its folder. Several: each gets its own folder below --out.
+        out_dir = out if out is not None and len(inputs) == 1 else None
+        out_parent = out if out is not None and len(inputs) > 1 else None
 
         if events:
+            reported: list[str] = []
+
+            def emit(event: dict, reported=reported) -> None:
+                reported.append(event["type"])
+                print(json.dumps(event), flush=True)
+
             try:
                 runner.run_recipe(
                     recipe,
@@ -171,12 +177,18 @@ def run(
                     out_dir,
                     registry=registry,
                     use_cache=not no_cache,
-                    events=lambda event: print(json.dumps(event), flush=True),
+                    events=emit,
+                    out_parent=out_parent,
                 )
             except KeyboardInterrupt:
                 raise typer.Exit(130) from None
-            except Exception:
+            except Cancelled:
                 failures += 1
+            except Exception as e:
+                failures += 1
+                # Problems found before the run starts never reach the runner's own events
+                if "run_failed" not in reported:
+                    emit({"type": "run_failed", "input": str(input_path), "error": str(e) or type(e).__name__})
             continue
 
         console.print(f"[bold]{input_path.name}[/bold]  ->  recipe [bold]{recipe.name}[/bold]")
@@ -210,7 +222,13 @@ def run(
         try:
             with progress:
                 record = runner.run_recipe(
-                    recipe, input_path, out_dir, registry=registry, use_cache=not no_cache, events=on_event
+                    recipe,
+                    input_path,
+                    out_dir,
+                    registry=registry,
+                    use_cache=not no_cache,
+                    events=on_event,
+                    out_parent=out_parent,
                 )
         except KeyboardInterrupt:
             console.print("[yellow]Cancelled. No output files were written.[/yellow]")
@@ -294,7 +312,15 @@ def serve(
         console.print(f"UI: http://{host}:{port}/")
     else:
         console.print("UI not built. For development: cd app && pnpm i && pnpm dev")
-    uvicorn.run(create_app(), host=host, port=port, log_level="warning")
+    from captainstems.server.app import LOCAL_HOSTS
+
+    # Requests must be addressed to a name the server was asked to answer to
+    if host in ("0.0.0.0", "::"):
+        hosts = ["*"]
+    else:
+        local = host in ("127.0.0.1", "localhost", "::1")
+        hosts = LOCAL_HOSTS + ([] if local else [host, f"[{host}]"])
+    uvicorn.run(create_app(allowed_hosts=hosts), host=host, port=port, log_level="warning")
 
 
 # Models ---------------------------------------------------------------------------
@@ -493,10 +519,17 @@ def cache_info() -> None:
 
 @cache_app.command("clear")
 def cache_clear() -> None:
-    """Delete all cached intermediate stems."""
+    """Delete all cached intermediate stems and the copies of files dropped onto the UI."""
+    import shutil
+
+    from captainstems import paths
     from captainstems.runner import Cache
 
-    console.print(f"Freed {_size(Cache().clear())}")
+    freed = Cache().clear()
+    uploads = paths.uploads_dir()
+    freed += sum(item.stat().st_size for item in uploads.rglob("*") if item.is_file())
+    shutil.rmtree(uploads, ignore_errors=True)
+    console.print(f"Freed {_size(freed)}")
 
 
 if __name__ == "__main__":

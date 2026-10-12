@@ -63,20 +63,32 @@ def peak_db(audio: np.ndarray) -> float:
     return max(-120.0, 20.0 * np.log10(peak)) if peak > 0 else -120.0
 
 
+SI_SDR_LIMIT = 120.0
+
+
 def si_sdr(estimate: np.ndarray, reference: np.ndarray) -> float:
-    """Scale-invariant signal-to-distortion ratio in dB, over all channels together."""
+    """
+    Scale-invariant signal-to-distortion ratio in dB, over all channels together.
+
+    Limited to +-120 dB: a perfect match or a silent reference would be
+    infinite, which JSON (run.json, the API) cannot hold.
+    """
     length = min(estimate.shape[-1], reference.shape[-1])
     estimate = estimate[..., :length].astype(np.float64).ravel()
     reference = reference[..., :length].astype(np.float64).ravel()
     reference_energy = float(np.dot(reference, reference))
     if reference_energy <= 0:
-        return float("-inf")
+        return -SI_SDR_LIMIT
     target = (float(np.dot(estimate, reference)) / reference_energy) * reference
     noise = estimate - target
     noise_energy = float(np.dot(noise, noise))
+    target_energy = float(np.dot(target, target))
+    if target_energy <= 0:
+        # Nothing of the reference is in the estimate (it is silent or unrelated)
+        return -SI_SDR_LIMIT
     if noise_energy <= 0:
-        return float("inf")
-    return 10.0 * np.log10(float(np.dot(target, target)) / noise_energy)
+        return SI_SDR_LIMIT
+    return float(max(-SI_SDR_LIMIT, min(SI_SDR_LIMIT, 10.0 * np.log10(target_energy / noise_energy))))
 
 
 def peaks(audio: np.ndarray, buckets: int = 2000) -> list[list[float]]:

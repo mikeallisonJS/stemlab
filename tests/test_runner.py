@@ -430,3 +430,99 @@ def test_default_output_folder_sits_next_to_the_input(tmp_path, registry):
 def test_missing_input_file(tmp_path, registry):
     with pytest.raises(audio.AudioError, match="File not found"):
         runner.run_recipe(recipe.loads(SEPARATE_EXPORT), tmp_path / "nope.wav", registry=registry)
+
+
+# Found in review -------------------------------------------------------------------
+
+
+def test_a_default_is_skipped_where_it_does_not_fit_but_must_fit_somewhere(clip, tmp_path, registry, fake_backend):
+    """`overlap` is a chunk count for one backend and a fraction for another."""
+    from conftest import FakeBackend
+
+    from captainstems.backends import base
+    from captainstems.backends.base import ParamSpec
+
+    fractional = FakeBackend()
+    fractional.name = "demucs"
+    fractional.supported_params = {
+        "device": fractional.supported_params["device"],
+        "overlap": ParamSpec("float", 0.25, "fraction", minimum=0.0, maximum=0.95),
+    }
+    fractional.device_defaults = lambda device, vram_mb: {}
+    base._instances["demucs"] = fractional
+    add_fake_model(registry, "fraction-model", ["vocals"], backend="demucs")
+
+    text = """
+defaults: {overlap: OVERLAP}
+nodes:
+  counted: {op: separate, model: vocal-model}
+  fraction: {op: separate, model: fraction-model}
+"""
+    record, _ = run(text.replace("OVERLAP", "4"), clip, tmp_path, registry)
+    assert record["nodes"]["counted"]["params"]["overlap"] == 4
+    assert record["nodes"]["fraction"]["params"]["overlap"] == 0.25, "the count does not fit a fraction; default kept"
+
+    record, _ = run(text.replace("OVERLAP", "0.5"), clip, tmp_path, registry)
+    assert record["nodes"]["fraction"]["params"]["overlap"] == 0.5
+    assert record["nodes"]["counted"]["params"]["overlap"] == 3, "falls back to the device default"
+
+    with pytest.raises(RecipeError, match="defaults.overlap fits no node"):
+        run(text.replace("OVERLAP", "500"), clip, tmp_path, registry)
+
+
+def test_same_named_inputs_get_separate_output_folders(tmp_path, registry):
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    first = write_tone(tmp_path / "a" / "song.wav", frequency=440)
+    second = write_tone(tmp_path / "b" / "song.wav", frequency=880)
+    parsed = recipe.loads(SEPARATE_EXPORT)
+    out = tmp_path / "out"
+
+    one = runner.run_recipe(parsed, first, registry=registry, out_parent=out)
+    two = runner.run_recipe(parsed, second, registry=registry, out_parent=out)
+    again = runner.run_recipe(parsed, first, registry=registry, out_parent=out)
+
+    assert one["output_dir"] == str(out / "song [two-node]")
+    assert two["output_dir"] == str(out / "song [two-node] (2)"), "another file with the same name must not overwrite"
+    assert again["output_dir"] == one["output_dir"], "running the same file again replaces its own results"
+    assert json.loads((out / "song [two-node]" / "run.json").read_text())["input"]["path"] == str(first.resolve())
+
+
+def test_a_changed_reference_file_is_not_served_from_the_cache(clip, tmp_path, registry):
+    mix, rate = audio.load(clip)
+    reference = tmp_path / "ref.wav"
+    text = f"""
+nodes:
+  vox: {{op: separate, model: vocal-model}}
+  check: {{op: analyze, inputs: {{stems: [vox.vocals]}}, params: {{reference: '{reference.as_posix()}'}}}}
+"""
+    audio.write(reference, mix * 0.5, rate, "wav", 32)
+    good, _ = run(text, clip, tmp_path, registry)
+    rng = np.random.default_rng(0)
+    audio.write(reference, rng.standard_normal(mix.shape).astype(np.float32) * 0.1, rate, "wav", 32)
+    bad, _ = run(text, clip, tmp_path, registry)
+
+    assert bad["nodes"]["check"]["cached"] is False
+    assert bad["nodes"]["check"]["cache_key"] != good["nodes"]["check"]["cache_key"]
+    assert good["nodes"]["check"]["info"]["metrics"]["si_sdr_db"] > 60
+    assert bad["nodes"]["check"]["info"]["metrics"]["si_sdr_db"] < 0
+    assert bad["nodes"]["vox"]["cached"] is True, "only the node that reads the reference is recomputed"
+
+    reference.unlink()
+    with pytest.raises(RecipeError, match="node 'check': reference file not found"):
+        run(text, clip, tmp_path, registry)
+
+
+def test_a_perfect_score_is_still_valid_json(clip, tmp_path, registry):
+    mix, rate = audio.load(clip)
+    reference = tmp_path / "same.wav"
+    audio.write(reference, mix * 0.5, rate, "wav", 32)
+    text = f"""
+nodes:
+  vox: {{op: separate, model: vocal-model}}
+  check: {{op: analyze, inputs: {{stems: [vox.vocals]}}, params: {{reference: '{reference.as_posix()}'}}}}
+"""
+    record, _ = run(text, clip, tmp_path, registry)
+    assert record["nodes"]["check"]["info"]["metrics"]["si_sdr_db"] == 120.0
+    json.dumps(record, allow_nan=False)
+    json.loads((tmp_path / "out" / "run.json").read_text(), parse_constant=lambda name: pytest.fail(name))

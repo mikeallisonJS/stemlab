@@ -114,11 +114,17 @@ def test_levels_and_si_sdr():
     assert dsp.peak_db(sine * 0.5) == pytest.approx(-6.02, abs=0.01)
     assert dsp.rms_db(np.zeros(10)) == -120.0
 
-    assert dsp.si_sdr(sine, sine) == float("inf")
-    assert dsp.si_sdr(sine * 0.25, sine) == float("inf"), "scale does not matter"
+    # A perfect match would be infinite; the score is capped so it stays valid JSON
+    assert dsp.si_sdr(sine, sine) == 120.0
+    assert dsp.si_sdr(sine * 0.25, sine) == pytest.approx(120.0, abs=0.01), "scale does not matter"
     noisy = sine + 0.1 * np.random.default_rng(1).standard_normal(len(sine)).astype(np.float32)
     assert dsp.si_sdr(noisy, sine) == pytest.approx(17.0, abs=0.5)
-    assert dsp.si_sdr(sine, np.zeros_like(sine)) == float("-inf")
+    assert dsp.si_sdr(sine, np.zeros_like(sine)) == -120.0
+    assert dsp.si_sdr(np.zeros_like(sine), sine) == -120.0
+    import json
+
+    for value in (dsp.si_sdr(sine, sine), dsp.si_sdr(sine, np.zeros_like(sine))):
+        json.dumps(value, allow_nan=False)
 
 
 def test_peaks_envelope():

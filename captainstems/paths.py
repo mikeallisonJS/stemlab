@@ -31,6 +31,20 @@ def cache_dir() -> Path:
     return path
 
 
+def uploads_dir() -> Path:
+    """Files dropped onto the UI: a browser can only hand over their bytes, not their location."""
+    path = home() / "uploads"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def outputs_dir() -> Path:
+    """Where the stems of dropped files go when no output folder was chosen."""
+    path = home() / "outputs"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def config_file() -> Path:
     """Per-user settings such as the chosen torch flavor."""
     return home() / "config.json"

@@ -8,6 +8,7 @@ A Demucs manifest names the bag's yaml as `config` and its `.th` files as
 
 from __future__ import annotations
 
+import random
 from typing import Any
 
 import numpy as np
@@ -60,19 +61,26 @@ class DemucsModel(Model):
             within = min(1.0, (float(info.get("segment_offset", 0)) + segment_length) / max(1, length))
             progress(min(1.0, (done + within) / passes))
 
-        with torch.no_grad():
-            out = apply_model(
-                self.model,
-                mix[None],
-                shifts=shifts,
-                split=bool(params.get("split", True)),
-                overlap=float(params.get("overlap", 0.25)),
-                segment=float(segment) if segment else None,
-                device=self.device,
-                progress=False,
-                callback=on_segment,
-                callback_arg={},
-            )[0]
+        # Demucs draws its time shifts from Python's global random generator.
+        # Seeding it makes a run repeatable from the parameters in run.json.
+        random_state = random.getstate()
+        random.seed(int(params.get("seed", 0)))
+        try:
+            with torch.no_grad():
+                out = apply_model(
+                    self.model,
+                    mix[None],
+                    shifts=shifts,
+                    split=bool(params.get("split", True)),
+                    overlap=float(params.get("overlap", 0.25)),
+                    segment=float(segment) if segment else None,
+                    device=self.device,
+                    progress=False,
+                    callback=on_segment,
+                    callback_arg={},
+                )[0]
+        finally:
+            random.setstate(random_state)
         check_cancel(cancel)
         out = out * std + mean
         result = out.cpu().numpy().astype(np.float32)
@@ -100,6 +108,9 @@ class DemucsBackend(Backend):
             "float", 0.0, "Segment length in seconds; 0 uses the model's own", minimum=0.0, maximum=600.0
         ),
         "split": ParamSpec("bool", True, "Process in segments; turning it off needs far more memory"),
+        "seed": ParamSpec(
+            "int", 0, "Seed for the random time shifts, so a run can be repeated exactly", minimum=0, maximum=2**31 - 1
+        ),
     }
 
     def version(self) -> dict:

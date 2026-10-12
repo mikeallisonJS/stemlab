@@ -27,7 +27,7 @@ WORKED_EXAMPLE = Path(__file__).parent.parent / "recipes" / "full-split-v1.yaml"
 @pytest.fixture
 def client(registry):
     manager = JobManager()
-    with TestClient(create_app(manager)) as client:
+    with TestClient(create_app(manager), base_url="http://127.0.0.1:8787") as client:
         client.manager = manager
         yield client
 
@@ -122,7 +122,7 @@ def test_a_job_runs_and_reports_its_result(client, clip, tmp_path):
 def test_events_are_replayed_and_followed_over_the_websocket(client, clip, tmp_path):
     created = submit(client, clip, tmp_path)
     events = []
-    with client.websocket_connect(f"/jobs/{created['id']}/events") as socket:
+    with client.websocket_connect(f"ws://127.0.0.1:8787/jobs/{created['id']}/events") as socket:
         while True:
             event = socket.receive_json()
             events.append(event)
@@ -135,7 +135,7 @@ def test_events_are_replayed_and_followed_over_the_websocket(client, clip, tmp_p
     assert events[-1]["status"] == "finished"
 
     # Connecting after the end still delivers the whole history
-    with client.websocket_connect(f"/jobs/{created['id']}/events") as socket:
+    with client.websocket_connect(f"ws://127.0.0.1:8787/jobs/{created['id']}/events") as socket:
         replay = []
         while True:
             event = socket.receive_json()
@@ -194,6 +194,13 @@ def test_cancelling_a_queued_job(client, clip, tmp_path, fake_backend):
     second = submit(client, clip, tmp_path / "second")
     assert client.delete(f"/jobs/{second['id']}").status_code == 409, "an active job cannot be deleted"
     assert client.post(f"/jobs/{second['id']}/cancel").json()["status"] == "cancelled"
+
+    # Whoever follows the cancelled job is told that it is over
+    with client.websocket_connect(f"ws://127.0.0.1:8787/jobs/{second['id']}/events") as socket:
+        kinds = []
+        while not kinds or kinds[-1] != "job_done":
+            kinds.append(socket.receive_json()["type"])
+    assert kinds == ["job_queued", "run_cancelled", "job_done"]
     gate.set()
     assert wait(client, first["id"])["status"] == "finished"
     assert client.get(f"/jobs/{second['id']}").json()["status"] == "cancelled"
@@ -316,6 +323,13 @@ def test_uploads_become_usable_inputs(client, clip, tmp_path):
     assert Path(uploaded["path"]).parent.parent.name == "uploads", "the name cannot escape the upload folder"
     assert wait(client, submit(client, uploaded["path"], tmp_path)["id"])["status"] == "finished"
 
+    # Without a chosen folder the stems of a dropped file go to the outputs folder, not into the upload
+    response = client.post("/jobs", json={"recipe": RECIPE, "inputs": [uploaded["path"]]})
+    job = wait(client, response.json()[0]["id"])
+    outputs = Path(client.get("/system").json()["outputs_dir"])
+    assert Path(job["output_dir"]) == outputs / "dropped song [api]"
+    assert (outputs / "dropped song [api]" / "run.json").is_file()
+
     assert client.post("/uploads", params={"name": "x.exe"}, content=b"MZ").status_code == 415
     assert client.post("/uploads", params={"name": "fake.wav"}, content=b"not audio").status_code == 415
     assert client.post("/uploads", params={"name": "empty.wav"}, content=b"").status_code == 400
@@ -327,7 +341,48 @@ def test_uploads_become_usable_inputs(client, clip, tmp_path):
 
 def test_requests_for_other_hosts_are_refused(client):
     assert client.get("/system", headers={"Host": "evil.example"}).status_code == 400
+    assert client.get("/system", headers={"Host": "testserver"}).status_code == 400
     assert client.get("/system", headers={"Host": "localhost"}).status_code == 200
+    assert client.get("/system", headers={"Host": "[::1]:8787"}).status_code == 200
+
+
+def test_serving_on_another_address_accepts_that_address(registry):
+    lan = TestClient(
+        create_app(JobManager(), allowed_hosts=["127.0.0.1", "192.168.1.20"]), base_url="http://192.168.1.20"
+    )
+    with lan:
+        assert lan.get("/system").status_code == 200
+        assert lan.get("/system", headers={"Host": "evil.example"}).status_code == 400
+
+
+def test_same_named_inputs_in_one_request_stay_apart(client, tmp_path):
+    from conftest import write_tone
+
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    inputs = [str(write_tone(tmp_path / "a" / "song.wav")), str(write_tone(tmp_path / "b" / "song.wav", frequency=880))]
+    created = client.post("/jobs", json={"recipe": RECIPE, "inputs": inputs, "out_dir": str(tmp_path / "out")}).json()
+    folders = sorted(Path(wait(client, item["id"])["output_dir"]).name for item in created)
+    assert folders == ["song [api]", "song [api] (2)"]
+
+
+def test_old_uploads_are_cleaned_up(home):
+    import os
+    import time
+
+    from captainstems import paths
+    from captainstems.server.app import clean_uploads
+
+    old = paths.uploads_dir() / "old"
+    fresh = paths.uploads_dir() / "fresh"
+    for folder in (old, fresh):
+        folder.mkdir()
+        (folder / "song.wav").write_bytes(b"x")
+    stale = time.time() - 30 * 86400
+    os.utime(old / "song.wav", (stale, stale))
+    os.utime(old, (stale, stale))
+    assert clean_uploads() == 1
+    assert not old.exists() and fresh.exists()
 
 
 def test_only_local_pages_may_read_the_api(client):

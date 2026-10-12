@@ -16,8 +16,10 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import os
+import shutil
 import string
 import sys
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -112,8 +114,43 @@ def _preview(path: str) -> Path:
     return preview
 
 
-def create_app(manager: JobManager | None = None, dev_origins: list[str] | None = None) -> FastAPI:
+LOCAL_HOSTS = ["127.0.0.1", "localhost", "[::1]"]
+# Dropped files are kept this long, so their runs can be repeated for a while
+UPLOAD_DAYS = 7
+
+
+def clean_uploads(max_age_days: float = UPLOAD_DAYS) -> int:
+    """Delete dropped files that have not been touched for a while. Returns how many folders went."""
+    removed = 0
+    limit = time.time() - max_age_days * 86400
+    for folder in paths.uploads_dir().iterdir():
+        try:
+            newest = max((item.stat().st_mtime for item in folder.rglob("*")), default=folder.stat().st_mtime)
+            if newest < limit:
+                shutil.rmtree(folder, ignore_errors=True)
+                removed += 1
+        except OSError:
+            continue
+    return removed
+
+
+def create_app(
+    manager: JobManager | None = None,
+    dev_origins: list[str] | None = None,
+    allowed_hosts: list[str] | None = None,
+) -> FastAPI:
+    """
+    Build the API.
+
+    Args:
+        manager: The job queue (a new one by default)
+        dev_origins: Extra origins allowed to read the API, besides local ones
+        allowed_hosts: Host names requests may be addressed to. Local names only by
+                       default, which keeps other websites from reaching the API
+                       through DNS rebinding; `serve --host` adds the address it binds
+    """
     jobs = manager or JobManager()
+    clean_uploads()
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -122,7 +159,7 @@ def create_app(manager: JobManager | None = None, dev_origins: list[str] | None 
 
     app = FastAPI(title="CaptainStems", version=__version__, lifespan=lifespan)
     # Local only: refuse requests addressed to any other host name (DNS rebinding)
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"])
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts or LOCAL_HOSTS)
     app.add_middleware(
         CORSMiddleware,
         allow_origin_regex=r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
@@ -151,6 +188,7 @@ def create_app(manager: JobManager | None = None, dev_origins: list[str] | None 
         info = device.system_info().to_dict()
         info["version"] = __version__
         info["cache_bytes"] = runner.Cache().size()
+        info["outputs_dir"] = str(paths.outputs_dir())
         return info
 
     @app.get("/schema")
@@ -264,13 +302,20 @@ def create_app(manager: JobManager | None = None, dev_origins: list[str] | None 
         except RecipeError as e:
             raise HTTPException(422, str(e)) from None
 
+        chosen = Path(body.out_dir).expanduser() if body.out_dir else None
+        uploads = paths.uploads_dir().resolve()
         created = []
         for path in inputs:
-            out_dir = None
-            if body.out_dir:
-                parent = Path(body.out_dir).expanduser()
-                out_dir = parent if len(inputs) == 1 else parent / runner.default_output_dir(path, parsed).name
-            created.append(jobs.submit(parsed, path.resolve(), out_dir, body.use_cache).summary())
+            path = path.resolve()
+            out_dir = out_parent = None
+            if chosen is not None and len(inputs) == 1:
+                out_dir = chosen
+            elif chosen is not None:
+                out_parent = chosen
+            elif uploads in path.parents:
+                # A dropped file lives in the app's data folder; "next to the input" would bury its stems there
+                out_parent = paths.outputs_dir()
+            created.append(jobs.submit(parsed, path, out_dir, body.use_cache, out_parent).summary())
         return created
 
     @app.get("/jobs")
@@ -404,7 +449,7 @@ def create_app(manager: JobManager | None = None, dev_origins: list[str] | None 
         safe = Path(name).name
         if Path(safe).suffix.lower() not in AUDIO_EXTENSIONS:
             raise HTTPException(415, f"'{safe}' is not an audio file")
-        folder = paths.home() / "uploads" / hashlib.sha256(os.urandom(16)).hexdigest()[:12]
+        folder = paths.uploads_dir() / hashlib.sha256(os.urandom(16)).hexdigest()[:12]
         folder.mkdir(parents=True, exist_ok=True)
         target = folder / safe
         size = 0
@@ -420,7 +465,7 @@ def create_app(manager: JobManager | None = None, dev_origins: list[str] | None 
         except Exception:
             target.unlink(missing_ok=True)
             raise HTTPException(415, f"'{safe}' could not be read as audio") from None
-        return {"path": str(target), "name": safe, "size": size, **details}
+        return {"path": str(target), "name": safe, "size": size, "uploaded": True, **details}
 
     @app.get("/audio/info")
     def audio_info(path: str) -> dict:

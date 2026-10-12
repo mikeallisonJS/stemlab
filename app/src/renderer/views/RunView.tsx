@@ -149,7 +149,10 @@ export function RunView({ recipe, validation, jobs, logs, inputs, setInputs, onJ
             <input value={outDir} onChange={(e) => setOutDir(e.target.value)} placeholder="next to each input file" />
             <button onClick={() => setPicker("folder")}>Browse...</button>
           </div>
-          <span className="field-help">Each file gets a folder named “track [recipe]” holding its stems and run.json.</span>
+          <span className="field-help">
+            Each file gets a folder named “track [recipe]” holding its stems and run.json. Dropped files are copied into
+            the app’s data folder first, so without a folder chosen here their stems go to its “outputs” folder.
+          </span>
         </label>
         <label className="check">
           <input type="checkbox" checked={useCache} onChange={(e) => setUseCache(e.target.checked)} />

@@ -56,6 +56,13 @@ def test_run_several_files_into_one_parent_folder(clip, tmp_path, registry):
     assert result.exit_code == 0, result.output
     assert sorted(path.name for path in out.iterdir()) == ["clip-5s [cli]", "other [cli]"]
 
+    # Two files with the same name from different folders stay apart
+    (tmp_path / "elsewhere").mkdir()
+    twin = write_tone(tmp_path / "elsewhere" / "other.wav", frequency=880)
+    result = runner.invoke(app, ["run", str(write_recipe(tmp_path)), str(other), str(twin), "--out", str(out)])
+    assert result.exit_code == 0, result.output
+    assert sorted(path.name for path in out.iterdir()) == ["clip-5s [cli]", "other [cli]", "other [cli] (2)"]
+
 
 def test_run_emits_json_events(clip, tmp_path, registry):
     result = runner.invoke(
@@ -64,6 +71,19 @@ def test_run_emits_json_events(clip, tmp_path, registry):
     assert result.exit_code == 0, result.output
     events = [json.loads(line) for line in result.output.splitlines() if line.startswith("{")]
     assert events[0]["type"] == "run_started" and events[-1]["type"] == "run_finished"
+
+
+def test_events_mode_reports_failures_that_happen_before_the_run(clip, tmp_path, registry):
+    missing_model = write_recipe(tmp_path, "nodes:\n  a: {op: separate, model: absent}\n")
+    result = runner.invoke(app, ["run", str(missing_model), str(clip), "--events"])
+    assert result.exit_code == 1
+    events = [json.loads(line) for line in result.output.splitlines() if line.startswith("{")]
+    assert [event["type"] for event in events] == ["run_failed"]
+    assert "is not installed" in events[0]["error"] and events[0]["input"] == str(clip)
+
+    result = runner.invoke(app, ["run", str(write_recipe(tmp_path)), str(tmp_path / "nope.wav"), "--events"])
+    events = [json.loads(line) for line in result.output.splitlines() if line.startswith("{")]
+    assert result.exit_code == 1 and events[-1]["type"] == "run_failed" and "File not found" in events[-1]["error"]
 
 
 def test_run_reports_problems_without_a_traceback(clip, tmp_path, registry):
