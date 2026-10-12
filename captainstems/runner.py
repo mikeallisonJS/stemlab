@@ -393,6 +393,7 @@ def run_recipe(
     cancel: Any = None,
     use_cache: bool = True,
     cache: Cache | None = None,
+    on_mix: Callable[[str], None] | None = None,
 ) -> dict:
     """
     Run a recipe on one audio file.
@@ -407,6 +408,8 @@ def run_recipe(
                 run_cancelled, run_failed
         cancel: Object with `is_set()`; set it to stop the run
         use_cache: Reuse cached intermediate stems
+        on_mix: Called with the path of the decoded input once it is available,
+                so a client can play it while the run is still going
 
     Returns:
         The run record, which is also written to `<out_dir>/run.json`
@@ -483,6 +486,8 @@ def run_recipe(
         if not cache.has(mix_key):
             cache.store(mix_key, {MIX: mix}, sample_rate, {"op": MIX, "source": str(input_path)})
         record["mix"] = {"cache_key": mix_key, "file": str(cache.stem_path(mix_key, MIX))}
+        if on_mix is not None:
+            on_mix(record["mix"]["file"])
 
         for name in order:
             base.check_cancel(cancel)

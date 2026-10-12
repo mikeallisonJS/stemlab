@@ -275,6 +275,28 @@ def schema(backends: bool = typer.Option(False, "--backends", help="Include each
     print(json.dumps(data if backends else data["recipe"], indent=2))
 
 
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", "--host", help="Address to listen on; keep it local"),
+    port: int = typer.Option(8787, "--port", "-p"),
+) -> None:
+    """Start the local API (and the UI, once built) for the app."""
+    try:
+        import uvicorn
+
+        from captainstems.server.app import UI_DIST, create_app
+    except ImportError as e:
+        _fail(f"The server extras are not installed ({e}). Run: uv sync --inexact --extra server")
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        console.print("[yellow]Warning: the API has no authentication. Only expose it on a network you trust.[/yellow]")
+    console.print(f"CaptainStems API on http://{host}:{port}")
+    if UI_DIST.is_dir():
+        console.print(f"UI: http://{host}:{port}/")
+    else:
+        console.print("UI not built. For development: cd app && pnpm i && pnpm dev")
+    uvicorn.run(create_app(), host=host, port=port, log_level="warning")
+
+
 # Models ---------------------------------------------------------------------------
 
 models_app = typer.Typer(help="Manage the model registry.", no_args_is_help=True)
