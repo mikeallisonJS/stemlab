@@ -71,8 +71,9 @@ class ParamSpec:
 # Knobs shared by every backend. Device and dtype are resolved by the runner.
 COMMON_PARAMS: dict[str, ParamSpec] = {
     "device": ParamSpec("enum", "auto", "Where to run the model", choices=("auto", "cuda", "mps", "cpu")),
-    "dtype": ParamSpec("enum", "auto", "Numeric precision; auto is fp16 on CUDA and fp32 elsewhere",
-                       choices=("auto", "fp16", "fp32")),
+    "dtype": ParamSpec(
+        "enum", "auto", "Numeric precision; auto is fp16 on CUDA and fp32 elsewhere", choices=("auto", "fp16", "fp32")
+    ),
     "normalize": ParamSpec("bool", False, "Normalize the input before separation and undo it afterwards"),
 }
 
@@ -86,8 +87,9 @@ class Model(ABC):
     sample_rate: int
 
     @abstractmethod
-    def separate(self, audio: np.ndarray, sample_rate: int, params: dict,
-                 progress: ProgressFn | None = None, cancel: Any = None) -> dict[str, np.ndarray]:
+    def separate(
+        self, audio: np.ndarray, sample_rate: int, params: dict, progress: ProgressFn | None = None, cancel: Any = None
+    ) -> dict[str, np.ndarray]:
         """
         Separate audio into stems.
 
@@ -105,7 +107,7 @@ class Model(ABC):
             Cancelled: if `cancel` was set
         """
 
-    def close(self) -> None:
+    def close(self) -> None:  # noqa: B027 - optional hook, not every model holds resources
         """Release the model's memory."""
 
 
@@ -123,6 +125,14 @@ class Backend(ABC):
     @abstractmethod
     def version(self) -> dict:
         """Versions of the libraries behind this backend, recorded in run.json."""
+
+    def device_defaults(self, device: str, vram_mb: int | None) -> dict:
+        """Starting values that depend on the hardware (batch size, overlap)."""
+        return {}
+
+    def model_defaults(self, manifest) -> dict:
+        """Values the model's own config file asks for (its chunk size)."""
+        return {}
 
     def available(self) -> str | None:
         """None if the backend can run, otherwise the reason it cannot."""

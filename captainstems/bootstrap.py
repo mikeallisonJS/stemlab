@@ -32,6 +32,9 @@ BACKEND_PACKAGES = [
     "librosa",
     "tqdm",
     "huggingface-hub",
+    # Needed by some MSST architectures only: htdemucs, bandit
+    "openunmix",
+    "pytorch-lightning",
 ]
 
 
@@ -58,7 +61,8 @@ def plan(flavor: str) -> list[list[str]]:
     if flavor not in device.FLAVORS:
         raise ValueError(f"unknown flavor '{flavor}' (use one of {', '.join(device.FLAVORS)})")
     base = installer()
-    torch_command = [*base, TORCH_SPEC]
+    # torchaudio must come from the same index to match the torch build
+    torch_command = [*base, TORCH_SPEC, "torchaudio"]
     index = device.TORCH_INDEX[flavor]
     if index:
         torch_command += ["--index-url", index]

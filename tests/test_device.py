@@ -58,7 +58,12 @@ def test_detection_order(monkeypatch):
 
 
 def test_device_defaults_follow_the_handoff_table():
-    assert device.device_defaults("cuda", 24000) == {"dtype": "fp16", "chunk_size": 352800, "overlap": 4, "batch_size": 4}
+    assert device.device_defaults("cuda", 24000) == {
+        "dtype": "fp16",
+        "chunk_size": 352800,
+        "overlap": 4,
+        "batch_size": 4,
+    }
     assert device.device_defaults("cuda", 8192)["batch_size"] == 1
     assert device.device_defaults("mps")["dtype"] == "fp32"
     assert device.device_defaults("cpu")["chunk_size"] == 176400

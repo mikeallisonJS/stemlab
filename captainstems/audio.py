@@ -48,8 +48,10 @@ def find_ffmpeg() -> str | None:
 def _require_ffmpeg() -> str:
     ffmpeg = find_ffmpeg()
     if not ffmpeg:
-        raise AudioError("FFmpeg is needed for this file format but was not found. "
-                         "Install it or set CAPTAINSTEMS_FFMPEG to its path.")
+        raise AudioError(
+            "FFmpeg is needed for this file format but was not found. "
+            "Install it or set CAPTAINSTEMS_FFMPEG to its path."
+        )
     return ffmpeg
 
 
@@ -61,7 +63,9 @@ def _ffmpeg(args: list[str], action: str) -> None:
         raise AudioError(f"FFmpeg could not {action}: " + " / ".join(detail))
 
 
-def load(path: str | os.PathLike, sample_rate: int | None = None, channels: int | None = None) -> tuple[np.ndarray, int]:
+def load(
+    path: str | os.PathLike, sample_rate: int | None = None, channels: int | None = None
+) -> tuple[np.ndarray, int]:
     """
     Read an audio file.
 
@@ -82,8 +86,10 @@ def load(path: str | os.PathLike, sample_rate: int | None = None, channels: int 
         # Not a libsndfile format: let FFmpeg decode it to float WAV first
         with tempfile.TemporaryDirectory(prefix="captainstems_") as tmp:
             decoded = Path(tmp) / "decoded.wav"
-            _ffmpeg(["-i", str(path), "-vn", "-map", "0:a:0", "-c:a", "pcm_f32le", str(decoded)],
-                    f"read '{path.name}' as audio")
+            _ffmpeg(
+                ["-i", str(path), "-vn", "-map", "0:a:0", "-c:a", "pcm_f32le", str(decoded)],
+                f"read '{path.name}' as audio",
+            )
             data, rate = sf.read(str(decoded), dtype="float32", always_2d=True)
     audio = np.ascontiguousarray(data.T)
     if audio.shape[1] == 0:
@@ -100,8 +106,11 @@ def info(path: str | os.PathLike) -> dict:
     """Sample rate, channels and duration of a file, without decoding all of it when possible."""
     try:
         meta = sf.info(str(path))
-        return {"sample_rate": meta.samplerate, "channels": meta.channels,
-                "duration": meta.frames / float(meta.samplerate)}
+        return {
+            "sample_rate": meta.samplerate,
+            "channels": meta.channels,
+            "duration": meta.frames / float(meta.samplerate),
+        }
     except Exception:
         audio, rate = load(path)
         return {"sample_rate": rate, "channels": audio.shape[0], "duration": audio.shape[1] / float(rate)}
@@ -141,8 +150,14 @@ def match_length(audio: np.ndarray, length: int) -> np.ndarray:
     return np.pad(audio, ((0, 0), (0, length - current)))
 
 
-def write(path: str | os.PathLike, audio: np.ndarray, sample_rate: int, fmt: str = "flac",
-          bit_depth: int = 24, bitrate: str = "320k") -> Path:
+def write(
+    path: str | os.PathLike,
+    audio: np.ndarray,
+    sample_rate: int,
+    fmt: str = "flac",
+    bit_depth: int = 24,
+    bitrate: str = "320k",
+) -> Path:
     """
     Write audio to a file. The extension of `path` is set to match `fmt`.
 
@@ -171,8 +186,18 @@ def write(path: str | os.PathLike, audio: np.ndarray, sample_rate: int, fmt: str
         with tempfile.TemporaryDirectory(prefix="captainstems_") as tmp:
             source = Path(tmp) / "source.wav"
             sf.write(str(source), np.clip(frames, -1.0, 1.0), sample_rate, subtype="PCM_24", format="WAV")
-            _ffmpeg(["-i", str(source), "-c:a", "libmp3lame", "-b:a",
-                     bitrate if bitrate in MP3_BITRATES else "320k", str(path)], f"write '{path.name}'")
+            _ffmpeg(
+                [
+                    "-i",
+                    str(source),
+                    "-c:a",
+                    "libmp3lame",
+                    "-b:a",
+                    bitrate if bitrate in MP3_BITRATES else "320k",
+                    str(path),
+                ],
+                f"write '{path.name}'",
+            )
     return path
 
 

@@ -24,7 +24,7 @@ def main() -> None:
     for beat in np.arange(0, SECONDS, 0.5):
         start = int(beat * SAMPLE_RATE)
         length = int(0.06 * SAMPLE_RATE)
-        drums[start:start + length] += 0.45 * rng.standard_normal(length) * np.linspace(1, 0, length) ** 2
+        drums[start : start + length] += 0.45 * rng.standard_normal(length) * np.linspace(1, 0, length) ** 2
     lead = 0.18 * np.sin(2 * np.pi * (440.0 * t + 12.0 * np.sin(2 * np.pi * 0.7 * t)))
 
     left = bass + drums + 0.8 * lead

@@ -1,0 +1,54 @@
+# The worked example from the handoff: best-available vocals, a phase-exact
+# instrumental, a 6 stem split of the instrumental with ensembled drums,
+# dereverbed vocals, FLAC out.
+#
+# Models: captainstems models fetch mel-band-roformer-vocals-kim htdemucs_6s scnet-large dereverb-mel-roformer
+version: 1
+name: full-split-v1
+defaults:            # applied to every separate/postprocess node unless overridden
+  device: auto
+  dtype: auto
+  normalize: true
+
+nodes:
+  vox:
+    op: separate
+    model: mel-band-roformer-vocals-kim   # registry id
+    targets: [vocals]
+    params: {chunk_size: 352800, overlap: 4, shifts: 2}
+
+  inst:
+    op: subtract
+    inputs: {a: mix, b: vox.vocals}
+
+  six:
+    op: separate
+    model: htdemucs_6s
+    inputs: {audio: inst.out}
+    targets: [drums, bass, other, piano, guitar]
+    params: {shifts: 2, overlap: 0.25}
+
+  drums_scnet:
+    op: separate
+    model: scnet-large
+    inputs: {audio: inst.out}
+    targets: [drums]
+
+  drums:
+    op: ensemble
+    inputs: [six.drums, drums_scnet.drums]
+    params: {method: avg, weights: [0.6, 0.4]}
+
+  vox_dry:
+    op: postprocess
+    model: dereverb-mel-roformer
+    inputs: {audio: vox.vocals}
+
+  check:
+    op: analyze
+    inputs: {mix: mix, stems: [vox_dry.out, drums.out, six.bass, six.other, six.piano, six.guitar]}
+
+  out:
+    op: export
+    inputs: [vox_dry.out, drums.out, six.bass, six.other, six.piano, six.guitar]
+    params: {format: flac, bit_depth: 24, naming: "{track}_{stem}"}

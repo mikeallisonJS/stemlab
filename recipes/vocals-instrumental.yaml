@@ -1,0 +1,24 @@
+# Vocals from a Mel-Band RoFormer, and the instrumental as mix minus vocals,
+# so the two files add back up to the original exactly.
+#
+# Models: captainstems models fetch mel-band-roformer-vocals-kim
+version: 1
+name: vocals-instrumental
+
+nodes:
+  vox:
+    op: separate
+    model: mel-band-roformer-vocals-kim
+    targets: [vocals]
+
+  inst:
+    op: subtract
+    inputs: {a: mix, b: vox.vocals}
+
+  check:
+    op: analyze
+    inputs: {stems: [vox.vocals, inst.out]}
+
+  out:
+    op: export
+    inputs: {vocals: vox.vocals, instrumental: inst.out}

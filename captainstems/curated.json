@@ -1,0 +1,240 @@
+{
+  "models": [
+    {
+      "id": "htdemucs",
+      "name": "HT Demucs v4",
+      "backend": "demucs",
+      "arch": "htdemucs",
+      "config": "htdemucs.yaml",
+      "weights": "955717e8-8726e21a.th",
+      "stems": [
+        "drums",
+        "bass",
+        "other",
+        "vocals"
+      ],
+      "license": "MIT (code); weights trained on MUSDB-HQ plus internal data",
+      "notes": "Hybrid Transformer Demucs, the 4 stem default",
+      "sample_rate": 44100,
+      "files": [
+        {
+          "name": "htdemucs.yaml",
+          "url": "https://raw.githubusercontent.com/facebookresearch/demucs/e976d93ecc3865e5757426930257e200846a520a/demucs/remote/htdemucs.yaml",
+          "sha256": "239c445d0b14454d541ad8bd9bb271c9e536d267e8a4625208744cbb2e7bb66c",
+          "size": 21
+        },
+        {
+          "name": "955717e8-8726e21a.th",
+          "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/955717e8-8726e21a.th",
+          "sha256": "8726e21a993978c7ba086d3872e7608d7d5bfca646ca4aca459ffda844faa8b4",
+          "size": 84141911
+        }
+      ]
+    },
+    {
+      "id": "htdemucs_ft",
+      "name": "HT Demucs v4 fine-tuned",
+      "backend": "demucs",
+      "arch": "htdemucs",
+      "config": "htdemucs_ft.yaml",
+      "weights": [
+        "f7e0c4bc-ba3fe64a.th",
+        "d12395a8-e57c48e6.th",
+        "92cfc3b6-ef3bcb9c.th",
+        "04573f0d-f3cf25b2.th"
+      ],
+      "stems": [
+        "drums",
+        "bass",
+        "other",
+        "vocals"
+      ],
+      "license": "MIT (code)",
+      "notes": "One fine-tuned network per stem; 4x the time of htdemucs",
+      "sample_rate": 44100,
+      "files": [
+        {
+          "name": "htdemucs_ft.yaml",
+          "url": "https://raw.githubusercontent.com/facebookresearch/demucs/e976d93ecc3865e5757426930257e200846a520a/demucs/remote/htdemucs_ft.yaml",
+          "sha256": "69470b8c1bbd674437b51bc9fb491327a10ab0396b702c93389b9cf750016346",
+          "size": 149
+        },
+        {
+          "name": "f7e0c4bc-ba3fe64a.th",
+          "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/f7e0c4bc-ba3fe64a.th",
+          "sha256": "ba3fe64ae8ef66ac9a4857222ce48efbdc5eb3ad375cb79dd13debee5aaa4066",
+          "size": 84141271
+        },
+        {
+          "name": "d12395a8-e57c48e6.th",
+          "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/d12395a8-e57c48e6.th",
+          "sha256": "e57c48e6b0e38af4f7118d7bd08c49f0a0c0edf7d09143bdd902ea0d237303e6",
+          "size": 84141271
+        },
+        {
+          "name": "92cfc3b6-ef3bcb9c.th",
+          "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/92cfc3b6-ef3bcb9c.th",
+          "sha256": "ef3bcb9c8b40d14ae5d51b6db2587339cc12c6b77c0be151ce6d69002e087bf2",
+          "size": 84141271
+        },
+        {
+          "name": "04573f0d-f3cf25b2.th",
+          "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/04573f0d-f3cf25b2.th",
+          "sha256": "f3cf25b222c4eed7cd49dd8b2c9597d50c18bd154090f7b919cfa5f93cf22c49",
+          "size": 84141271
+        }
+      ]
+    },
+    {
+      "id": "htdemucs_6s",
+      "name": "HT Demucs v4 6 stems",
+      "backend": "demucs",
+      "arch": "htdemucs",
+      "config": "htdemucs_6s.yaml",
+      "weights": "5c90dfd2-34c22ccb.th",
+      "stems": [
+        "drums",
+        "bass",
+        "other",
+        "vocals",
+        "guitar",
+        "piano"
+      ],
+      "license": "MIT (code)",
+      "notes": "Adds guitar and piano; the piano stem is the weakest",
+      "sample_rate": 44100,
+      "files": [
+        {
+          "name": "htdemucs_6s.yaml",
+          "url": "https://raw.githubusercontent.com/facebookresearch/demucs/e976d93ecc3865e5757426930257e200846a520a/demucs/remote/htdemucs_6s.yaml",
+          "sha256": "207405151270af8fd81c2373c25d27950916682ac91dca7884a11ce13dad6f58",
+          "size": 21
+        },
+        {
+          "name": "5c90dfd2-34c22ccb.th",
+          "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/5c90dfd2-34c22ccb.th",
+          "sha256": "34c22ccb381c6f9fdbf324f04e1e2fe21aaaf293f5ded163a162697ff9a02ddd",
+          "size": 54996327
+        }
+      ]
+    },
+    {
+      "id": "mel-band-roformer-vocals-kim",
+      "name": "Mel-Band RoFormer Vocals (Kim)",
+      "backend": "msst",
+      "arch": "mel_band_roformer",
+      "config": "config.yaml",
+      "weights": "model.ckpt",
+      "license": "GPL-3.0 as published by the author",
+      "notes": "KimberleyJensen's vocal model; SDR 10.98 on the MSST leaderboard. A good default for vocals",
+      "defaults": {
+        "overlap": 4
+      },
+      "stems": [
+        "vocals"
+      ],
+      "sample_rate": 44100,
+      "files": [
+        {
+          "name": "config.yaml",
+          "url": "https://raw.githubusercontent.com/ZFTurbo/Music-Source-Separation-Training/84b1eac0887756b4f1a9d7a1ff49105939749ed2/configs/KimberleyJensen/config_vocals_mel_band_roformer_kj.yaml",
+          "sha256": "f63f38eb1e6e40a7db0dade714a5ae257555dd8748f4e774eae8679275a81926",
+          "size": 1721
+        },
+        {
+          "name": "model.ckpt",
+          "url": "https://huggingface.co/KimberleyJSN/melbandroformer/resolve/main/MelBandRoformer.ckpt",
+          "sha256": "87201f4d31afb5bc79993230fc49446918425574db48c01c405e44f365c7559e",
+          "size": 913106900
+        }
+      ]
+    },
+    {
+      "id": "bs-roformer-vocals-viperx",
+      "name": "BS-RoFormer Vocals (viperx 1297)",
+      "backend": "msst",
+      "arch": "bs_roformer",
+      "config": "config.yaml",
+      "weights": "model.ckpt",
+      "license": "not stated by the author",
+      "notes": "viperx's ep_317 checkpoint, SDR 12.97 on vocals in UVR's ranking",
+      "stems": [
+        "vocals"
+      ],
+      "sample_rate": 44100,
+      "files": [
+        {
+          "name": "config.yaml",
+          "url": "https://raw.githubusercontent.com/ZFTurbo/Music-Source-Separation-Training/84b1eac0887756b4f1a9d7a1ff49105939749ed2/configs/viperx/model_bs_roformer_ep_317_sdr_12.9755.yaml",
+          "sha256": "42e5635ceab7287b83d9591c9880966f0b61cff26a0a40a29d236bacb32e5f2c",
+          "size": 1881
+        },
+        {
+          "name": "model.ckpt",
+          "url": "https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/model_bs_roformer_ep_317_sdr_12.9755.ckpt",
+          "sha256": "5b84f37e8d444c8cb30c79d77f613a41c05868ff9c9ac6c7049c00aefae115aa",
+          "size": 639331213
+        }
+      ]
+    },
+    {
+      "id": "dereverb-mel-roformer",
+      "name": "Mel-Band RoFormer Dereverb (anvuew)",
+      "backend": "msst",
+      "arch": "mel_band_roformer",
+      "config": "config.yaml",
+      "weights": "model.ckpt",
+      "license": "GPL-3.0 as published by the author",
+      "notes": "Removes reverb from a vocal stem; SDR 19.17",
+      "stems": [
+        "noreverb"
+      ],
+      "sample_rate": 44100,
+      "files": [
+        {
+          "name": "config.yaml",
+          "url": "https://huggingface.co/anvuew/dereverb_mel_band_roformer/resolve/main/dereverb_mel_band_roformer_anvuew.yaml",
+          "sha256": "66963a9d60756076506a230b4e503c553a3beb7b4e9a10e6bcc73dee9dbd4866",
+          "size": 1846
+        },
+        {
+          "name": "model.ckpt",
+          "url": "https://huggingface.co/anvuew/dereverb_mel_band_roformer/resolve/main/dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
+          "sha256": "9262877b87e9ebb0fb808a456b0a411fa677f5df31c8383c1254af531c078970",
+          "size": 913107578
+        }
+      ]
+    },
+    {
+      "id": "scnet-large",
+      "name": "SCNet Large (starrytong)",
+      "backend": "msst",
+      "arch": "scnet",
+      "config": "config.yaml",
+      "weights": "model.ckpt",
+      "license": "MIT (MSST release)",
+      "notes": "4 stem SCNet; strong drums (SDR 11.15 on MUSDB)",
+      "stems": [
+        "drums",
+        "bass",
+        "other",
+        "vocals"
+      ],
+      "sample_rate": 44100,
+      "files": [
+        {
+          "name": "config.yaml",
+          "url": "https://github.com/ZFTurbo/Music-Source-Separation-Training/releases/download/v1.0.9/config_musdb18_scnet_large_starrytong.yaml",
+          "sha256": "3efa43af7c50d4a6e1105d2599d2d6a31c8012ee99eaad9a7e80e057945d44ee",
+          "size": 1955
+        },
+        {
+          "name": "model.ckpt",
+          "url": "https://github.com/ZFTurbo/Music-Source-Separation-Training/releases/download/v1.0.9/SCNet-large_starrytong_fixed.ckpt",
+          "sha256": "65900dfa07d6b6e5d784c0f143920200a4bd281d6e78a806c549d0b912d5885e",
+          "size": 168852258
+        }
+      ]
+    }
+  ]
+}
