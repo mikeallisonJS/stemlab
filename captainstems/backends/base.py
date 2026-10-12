@@ -126,6 +126,12 @@ class Backend(ABC):
     def version(self) -> dict:
         """Versions of the libraries behind this backend, recorded in run.json."""
 
+    def resolve_device(self, requested: str) -> str:
+        """Turn a device request ("auto" included) into one this backend can use right now."""
+        from captainstems.backends import device
+
+        return device.resolve_device(requested)
+
     def device_defaults(self, device: str, vram_mb: int | None) -> dict:
         """Starting values that depend on the hardware (batch size, overlap)."""
         return {}

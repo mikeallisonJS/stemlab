@@ -112,6 +112,11 @@ class FakeBackend:
     def version(self):
         return {"fake": "1.0"}
 
+    def resolve_device(self, requested):
+        from captainstems.backends import device
+
+        return device.resolve_device(requested)
+
     def device_defaults(self, device, vram_mb):
         return {"overlap": 3, "batch_size": 2}
 

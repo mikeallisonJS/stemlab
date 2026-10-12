@@ -81,7 +81,7 @@ def test_dtype_resolution():
 def test_bootstrap_plan_picks_one_torch_index_and_one_onnxruntime(monkeypatch):
     cuda = bootstrap.plan("cuda")
     assert cuda[0][-2:] == ["--index-url", device.TORCH_INDEX["cuda"]]
-    assert cuda[-1][-1] == "onnxruntime-gpu"
+    assert cuda[-1][-1].startswith("onnxruntime-gpu") and "<1.24" in cuda[-1][-1], "must match torch's CUDA 12"
 
     monkeypatch.setattr(bootstrap.sys, "platform", "darwin")
     mps = bootstrap.plan("mps")

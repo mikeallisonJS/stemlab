@@ -235,6 +235,60 @@
           "size": 168852258
         }
       ]
+    },
+    {
+      "id": "uvr-mdx-net-inst-hq-3",
+      "name": "UVR MDX-Net Inst HQ 3",
+      "backend": "onnx",
+      "arch": "mdx_net",
+      "weights": "model.onnx",
+      "stems": [
+        "instrumental"
+      ],
+      "license": "MIT (UVR model repository)",
+      "notes": "Instrumental model from Ultimate Vocal Remover; subtract it from the mix for vocals",
+      "onnx_params": {
+        "dim_f": 3072,
+        "dim_t": 256,
+        "n_fft": 6144,
+        "compensate": 1.022
+      },
+      "sample_rate": 44100,
+      "files": [
+        {
+          "name": "model.onnx",
+          "url": "https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/UVR-MDX-NET-Inst_HQ_3.onnx",
+          "sha256": "317554b07fe1ea5279a77f2b1520a41ea4b93432560c4ffd08792c30fddf9adc",
+          "size": 66759214
+        }
+      ]
+    },
+    {
+      "id": "uvr-mdx-kim-vocal-2",
+      "name": "UVR MDX-Net Kim Vocal 2",
+      "backend": "onnx",
+      "arch": "mdx_net",
+      "weights": "model.onnx",
+      "stems": [
+        "vocals"
+      ],
+      "license": "MIT (UVR model repository)",
+      "notes": "KimberleyJensen's MDX-Net vocal model; light enough for CPUs and any GPU",
+      "onnx_params": {
+        "dim_f": 3072,
+        "dim_t": 256,
+        "n_fft": 7680,
+        "compensate": 1.009
+      },
+      "sample_rate": 44100,
+      "files": [
+        {
+          "name": "model.onnx",
+          "url": "https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/Kim_Vocal_2.onnx",
+          "sha256": "ce74ef3b6a6024ce44211a07be9cf8bc6d87728cc852a68ab34eb8e58cde9c8b",
+          "size": 66759214
+        }
+      ]
     }
   ]
 }

@@ -41,7 +41,9 @@ BACKEND_PACKAGES = [
 def onnxruntime_package(flavor: str) -> str:
     """onnxruntime's wheels are per provider and conflict; exactly one is installed."""
     if flavor == "cuda":
-        return "onnxruntime-gpu"
+        # Builds up to 1.23 use CUDA 12, whose libraries come with the torch build above.
+        # Later ones need CUDA 13 and would find no cuDNN.
+        return "onnxruntime-gpu>=1.20,<1.24"
     if sys.platform == "win32":
         # DirectML runs on any DirectX 12 GPU and includes the CPU provider
         return "onnxruntime-directml"

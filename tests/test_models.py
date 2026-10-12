@@ -124,3 +124,20 @@ nodes:
     assert a.shape == b.shape and np.isfinite(b).all()
     assert not np.array_equal(a, b), "different settings give a different result"
     assert np.corrcoef(a.ravel(), b.ravel())[0, 1] > 0.9, "but still the same stem"
+
+
+def test_mdx_net_onnx_model(real_home, clip, tmp_path):
+    pytest.importorskip("onnxruntime", reason="run `captainstems bootstrap` first")
+    registry = model(real_home, "uvr-mdx-kim-vocal-2")
+    text = """
+nodes:
+  vox: {op: separate, model: uvr-mdx-kim-vocal-2}
+  inst: {op: subtract, inputs: {a: mix, b: vox.vocals}}
+  out: {op: export, inputs: {vocals: vox.vocals, inst: inst.out}, params: {format: wav, bit_depth: 32}}
+"""
+    record = runner.run_recipe(recipe.loads(text), clip, tmp_path / "out", registry=registry, use_cache=False)
+    params = record["nodes"]["vox"]["params"]
+    assert params["compensate"] == 1.009, "taken from the manifest's onnx_params"
+    assert params["device"] in ("cuda", "dml", "coreml", "cpu")
+    assert record["backends"]["onnx"]["onnxruntime"]
+    stems_add_up(tmp_path / "out", ["vocals", "inst"], clip, tolerance_db=-90.0)

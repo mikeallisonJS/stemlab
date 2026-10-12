@@ -167,7 +167,7 @@ def resolve_params(backend, registered, recipe_defaults: dict, node_params: dict
 
     requested = node_params.get("device", recipe_defaults.get("device", manifest_defaults.get("device", "auto")))
     try:
-        resolved_device = device.resolve_device(requested)
+        resolved_device = backend.resolve_device(requested)
     except (RuntimeError, ValueError) as e:
         raise RecipeError(f"node '{node_name}': {e}") from None
 
