@@ -27,6 +27,11 @@ def doctor(
     set_flavor: str = typer.Option(
         None, "--set-flavor", help="Override the torch flavor: cuda, rocm, mps, cpu or auto"
     ),
+    set_rocm_target: str = typer.Option(
+        None,
+        "--set-rocm-target",
+        help="Windows: the GPU target AMD's ROCm wheels are built for (gfx1151, gfx1100, ...) or auto",
+    ),
 ) -> None:
     """Show the detected OS, GPU, torch flavor and backend versions."""
     from captainstems import bootstrap
@@ -39,6 +44,13 @@ def doctor(
             device.write_config(torch_flavor=set_flavor)
         else:
             _fail(f"Unknown flavor '{set_flavor}'. Use cuda, rocm, mps, cpu or auto.", 2)
+    if set_rocm_target is not None:
+        if set_rocm_target == "auto":
+            device.write_config(rocm_target=None)
+        elif set_rocm_target.startswith("gfx"):
+            device.write_config(rocm_target=set_rocm_target)
+        else:
+            _fail(f"Unknown ROCm target '{set_rocm_target}'. Use a gfx name such as gfx1151, or auto.", 2)
 
     info = device.system_info()
     if as_json:
@@ -59,10 +71,15 @@ def doctor(
         else f"{info.flavor} (override; detected {info.detected_flavor})"
     )
     table.add_row("Torch flavor", flavor)
+    if info.rocm_target:
+        table.add_row("ROCm target", info.rocm_target)
 
     torch = info.torch
     if torch["version"]:
-        runs_on = "CUDA" if torch["cuda"] else ("MPS" if torch["mps"] else "CPU only")
+        if torch["cuda"]:
+            runs_on = f"ROCm (HIP {torch['hip']})" if torch.get("hip") else "CUDA"
+        else:
+            runs_on = "MPS" if torch["mps"] else "CPU only"
         table.add_row("torch", f"{torch['version']} - {runs_on}")
     else:
         table.add_row("torch", "[yellow]not installed[/yellow]")
@@ -83,12 +100,16 @@ def doctor(
     table.add_row("Data folder", info.home)
     console.print(table)
 
-    expected_cuda = info.flavor == "cuda"
-    if not torch["version"] or (expected_cuda and not torch["cuda"]):
+    # ROCm builds of torch report the GPU as CUDA
+    expected_gpu = info.flavor in ("cuda", "rocm")
+    if not torch["version"] or (expected_gpu and not torch["cuda"]):
         console.print("\nThe model libraries are missing or do not match the GPU. Install them with:")
         console.print("  [bold]captainstems bootstrap[/bold]\nwhich runs:")
-        for command in bootstrap.plan(info.flavor):
-            console.print("  " + " ".join(command), highlight=False, soft_wrap=True)
+        try:
+            for command in bootstrap.plan(info.flavor):
+                console.print("  " + " ".join(command), highlight=False, soft_wrap=True)
+        except ValueError as e:
+            console.print(f"  [yellow]{e}[/yellow]")
 
 
 @app.command("bootstrap")

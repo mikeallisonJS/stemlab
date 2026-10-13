@@ -84,8 +84,8 @@ export function ModelsView({ system, models, onChanged }: Props) {
           <table className="facts">
             <tbody>
               <tr><th>GPU</th><td>{system.gpu ? `${system.gpu}${system.vram_mb ? ` (${Math.round(system.vram_mb / 1024)} GB)` : ""}` : "none detected"}</td></tr>
-              <tr><th>Torch flavor</th><td>{system.flavor}{system.flavor_source === "override" ? ` (override; detected ${system.detected_flavor})` : ""}</td></tr>
-              <tr><th>torch</th><td>{system.torch.version ? `${system.torch.version} · ${system.torch.cuda ? "CUDA" : system.torch.mps ? "MPS" : "CPU only"}` : "not installed: run captainstems bootstrap"}</td></tr>
+              <tr><th>Torch flavor</th><td>{system.flavor}{system.flavor_source === "override" ? ` (override; detected ${system.detected_flavor})` : ""}{system.rocm_target ? ` · ${system.rocm_target}` : ""}</td></tr>
+              <tr><th>torch</th><td>{system.torch.version ? `${system.torch.version} · ${system.torch.cuda ? (system.torch.hip ? "ROCm" : "CUDA") : system.torch.mps ? "MPS" : "CPU only"}` : "not installed: run captainstems bootstrap"}</td></tr>
               <tr><th>onnxruntime</th><td>{system.onnxruntime.version ? `${system.onnxruntime.version} · ${system.onnxruntime.providers.map((p) => p.replace("ExecutionProvider", "")).join(", ")}` : "not installed"}</td></tr>
               <tr><th>FFmpeg</th><td>{system.ffmpeg ?? "not found"}</td></tr>
               {Object.entries(system.backends).map(([name, versions]) => (

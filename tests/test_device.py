@@ -101,3 +101,76 @@ def test_bootstrap_dry_run_prints_the_exact_commands(home):
     assert result.exit_code == 0
     lines = result.output.strip().splitlines()
     assert len(lines) == 3 and "whl/cpu" in lines[0]
+
+
+STRIX_HALO = {"name": "AMD Radeon(TM) 8060S Graphics", "pci": "pci\\ven_1002&dev_1586", "memory": 32 * 1024**3}
+UNKNOWN_AMD = {"name": "AMD Radeon(TM) Vega 8 Graphics", "pci": "pci\\ven_1002&dev_15d8", "memory": 2 * 1024**3}
+INTEL = {"name": "Intel(R) UHD Graphics", "pci": "pci\\ven_8086&dev_9a49", "memory": 128 * 1024**2}
+
+
+def _windows_with(monkeypatch, *adapters):
+    device.detect_gpu.cache_clear()
+    monkeypatch.setattr(device.shutil, "which", lambda name: None)
+    monkeypatch.setattr(device.sys, "platform", "win32")
+    monkeypatch.setattr(device, "_windows_display_adapters", lambda: list(adapters))
+
+
+def test_windows_amd_gpu_is_rocm_when_amd_builds_wheels_for_it(monkeypatch, home):
+    _windows_with(monkeypatch, INTEL, STRIX_HALO)
+    assert device.detect_gpu() == ("rocm", "AMD Radeon(TM) 8060S Graphics", 32768)
+    assert device.rocm_target() == "gfx1151"
+    assert device.torch_index("rocm") == device.ROCM_WINDOWS_INDEX
+
+    # Other AMD GPUs keep torch on the CPU, but are still named
+    _windows_with(monkeypatch, UNKNOWN_AMD)
+    assert device.detect_gpu() == ("cpu", "AMD Radeon(TM) Vega 8 Graphics", 2048)
+    assert device.rocm_target() is None
+
+    _windows_with(monkeypatch, INTEL)
+    assert device.detect_gpu() == ("cpu", None, None)
+    device.detect_gpu.cache_clear()
+
+
+def test_rocm_targets_cover_the_gpus_amd_lists():
+    assert device.rocm_target_for("AMD Radeon(TM) 8060S Graphics") == "gfx1151"
+    assert device.rocm_target_for("AMD Radeon 890M Graphics") == "gfx1150"
+    assert device.rocm_target_for("AMD Radeon RX 7900 XTX") == "gfx1100"
+    assert device.rocm_target_for("AMD Radeon RX 7800 XT") == "gfx1101"
+    assert device.rocm_target_for("AMD Radeon RX 7700S") == "gfx1102"
+    assert device.rocm_target_for("AMD Radeon RX 9070 XT") == "gfx1201"
+    assert device.rocm_target_for("AMD Radeon RX 9060 XT") == "gfx1200"
+    assert device.rocm_target_for("AMD Radeon RX 6800 XT") is None
+
+
+def test_rocm_target_can_be_overridden(monkeypatch, home):
+    _windows_with(monkeypatch, UNKNOWN_AMD)
+    assert runner.invoke(app, ["doctor", "--set-rocm-target", "gfx1100"]).exit_code == 0
+    assert device.rocm_target() == "gfx1100"
+    assert runner.invoke(app, ["doctor", "--set-rocm-target", "navi"]).exit_code == 2
+    assert runner.invoke(app, ["doctor", "--set-rocm-target", "auto"]).exit_code == 0
+    assert device.rocm_target() is None
+    device.detect_gpu.cache_clear()
+
+
+def test_bootstrap_plan_for_rocm_on_windows_uses_amd_wheels(monkeypatch, home):
+    monkeypatch.setattr(bootstrap.sys, "platform", "win32")
+    monkeypatch.setattr(device.sys, "platform", "win32")
+    monkeypatch.setattr(device, "rocm_target", lambda: "gfx1151")
+    commands = bootstrap.plan("rocm")
+    assert commands[0][-4:] == [
+        "torch[device-gfx1151]>=2.6,<2.15",
+        "torchaudio",
+        "--index-url",
+        device.ROCM_WINDOWS_INDEX,
+    ]
+    assert "--reinstall-package" in commands[0] or "--force-reinstall" in commands[0]
+    assert commands[-1][-1] == "onnxruntime-directml", "no onnxruntime ROCm build exists for Windows"
+
+    monkeypatch.setattr(device, "rocm_target", lambda: None)
+    with pytest.raises(ValueError, match="set-rocm-target"):
+        bootstrap.plan("rocm")
+
+    # Linux keeps the pytorch.org build
+    monkeypatch.setattr(bootstrap.sys, "platform", "linux")
+    monkeypatch.setattr(device.sys, "platform", "linux")
+    assert bootstrap.plan("rocm")[0][-2:] == ["--index-url", device.TORCH_INDEX["rocm"]]

@@ -17,7 +17,8 @@ from collections.abc import Callable
 from captainstems.backends import device
 
 # Verified with the bundled backends
-TORCH_SPEC = "torch>=2.6,<2.15"
+TORCH_VERSION = ">=2.6,<2.15"
+TORCH_SPEC = "torch" + TORCH_VERSION
 
 # What the backends import at inference time. MSST's own requirements.txt also
 # covers training (wandb, audiomentations, a GUI toolkit) and pins versions
@@ -58,14 +59,38 @@ def installer() -> list[str]:
     return [sys.executable, "-m", "pip", "install"]
 
 
+def reinstall_flags() -> list[str]:
+    """
+    Replace an installed torch even when its version already satisfies the spec:
+    between flavors the version stays and the build (CPU, CUDA, ROCm) changes.
+    """
+    if shutil.which("uv"):
+        return ["--reinstall-package", "torch", "--reinstall-package", "torchaudio"]
+    return ["--force-reinstall"]
+
+
+def torch_requirement(flavor: str) -> str:
+    """torch, with the extra that picks AMD's build for the GPU target on Windows ROCm."""
+    if flavor == "rocm" and sys.platform == "win32":
+        target = device.rocm_target()
+        if not target:
+            raise ValueError(
+                "ROCm on Windows needs the GPU target AMD builds its wheels for, and this GPU is not "
+                "in the list of known ones. Set it with `captainstems doctor --set-rocm-target gfx1151` "
+                "(gfx1151: Ryzen AI Max, gfx1150: Ryzen AI 300, gfx110X: RX 7000, gfx120X: RX 9000)."
+            )
+        return f"torch[device-{target}]{TORCH_VERSION}"
+    return TORCH_SPEC
+
+
 def plan(flavor: str) -> list[list[str]]:
     """The exact commands a bootstrap for this flavor runs, in order."""
     if flavor not in device.FLAVORS:
         raise ValueError(f"unknown flavor '{flavor}' (use one of {', '.join(device.FLAVORS)})")
     base = installer()
     # torchaudio must come from the same index to match the torch build
-    torch_command = [*base, TORCH_SPEC, "torchaudio"]
-    index = device.TORCH_INDEX[flavor]
+    torch_command = [*base, *reinstall_flags(), torch_requirement(flavor), "torchaudio"]
+    index = device.torch_index(flavor)
     if index:
         torch_command += ["--index-url", index]
     return [

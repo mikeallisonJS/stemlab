@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 import json
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -22,6 +23,31 @@ TORCH_INDEX = {
     "cpu": "https://download.pytorch.org/whl/cpu",
 }
 
+# pytorch.org has no ROCm build for Windows. AMD publishes its own, compiled per
+# GPU target: `torch[device-<target>]` from this index installs torch together
+# with the HIP runtime and the libraries for that target.
+ROCM_WINDOWS_INDEX = "https://stable.repo.amd.com/rocm/whl-next/"
+
+# Adapter name on Windows (a regular expression on the driver's description) ->
+# the target AMD builds Windows wheels for. Only GPUs AMD lists for ROCm on Windows.
+ROCM_WINDOWS_TARGETS = (
+    (r"Radeon(\(TM\))? 80[46]0S", "gfx1151"),  # Ryzen AI Max (Strix Halo)
+    (r"Radeon(\(TM\))? 8[89]0M", "gfx1150"),  # Ryzen AI 300 (Strix Point)
+    (r"Radeon RX 7[67]00[SM]", "gfx1102"),  # Navi 33 mobile
+    (r"Radeon RX 76\d0", "gfx1102"),  # Navi 33: RX 7600, 7600 XT, 7650 GRE
+    (r"Radeon RX 7[78]\d0", "gfx1101"),  # Navi 32: RX 7700 XT, 7800 XT, 7800M
+    (r"Radeon RX 79\d0", "gfx1100"),  # Navi 31: RX 7900 series, 7900M
+    (r"Radeon RX 9070", "gfx1201"),  # Navi 48
+    (r"Radeon RX 9060", "gfx1200"),  # Navi 44
+)
+
+
+def torch_index(flavor: str) -> str | None:
+    """Where the torch wheels for a flavor come from on this platform."""
+    if flavor == "rocm" and sys.platform == "win32":
+        return ROCM_WINDOWS_INDEX
+    return TORCH_INDEX[flavor]
+
 
 def _run(command: list[str], timeout: int = 15) -> str | None:
     try:
@@ -35,7 +61,8 @@ def _run(command: list[str], timeout: int = 15) -> str | None:
 def detect_gpu() -> tuple[str, str | None, int | None]:
     """
     Detect the GPU flavor in the order the handoff fixes:
-    nvidia-smi -> CUDA; rocminfo on Linux -> ROCm; arm64 macOS -> MPS; else CPU.
+    nvidia-smi -> CUDA; rocminfo on Linux -> ROCm; a supported AMD GPU on Windows -> ROCm;
+    arm64 macOS -> MPS; else CPU.
 
     Returns:
         (flavor, GPU name, VRAM in MiB), the last two None when unknown
@@ -53,10 +80,87 @@ def detect_gpu() -> tuple[str, str | None, int | None]:
         if _run(["rocminfo"]) is not None:
             return "rocm", "AMD GPU (ROCm)", None
 
+    if sys.platform == "win32":
+        found = _windows_amd_gpu()
+        if found:
+            name, memory, target = found
+            # Without a target AMD builds Windows wheels for, torch stays on the CPU
+            # (onnxruntime still uses the GPU through DirectML)
+            return ("rocm" if target else "cpu"), name, memory
+
     if sys.platform == "darwin" and platform.machine() == "arm64":
         return "mps", "Apple Silicon", None
 
     return "cpu", None, None
+
+
+@functools.lru_cache(maxsize=1)
+def _windows_display_adapters() -> list[dict]:
+    """
+    The display adapters Windows knows, from the registry's display class: name, PCI
+    id and dedicated memory. Needs no vendor tool, which AMD does not ship for ROCm.
+    """
+    import winreg
+
+    adapters = []
+    display_class = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, display_class) as root:
+            for index in range(256):
+                try:
+                    subkey = winreg.EnumKey(root, index)
+                except OSError:
+                    break
+                if not subkey.isdigit():
+                    continue
+                try:
+                    with winreg.OpenKey(root, subkey) as adapter:
+                        name = winreg.QueryValueEx(adapter, "DriverDesc")[0]
+                        try:
+                            pci = winreg.QueryValueEx(adapter, "MatchingDeviceId")[0]
+                        except OSError:
+                            pci = ""
+                        try:
+                            memory = winreg.QueryValueEx(adapter, "HardwareInformation.qwMemorySize")[0]
+                        except OSError:
+                            memory = None
+                except OSError:
+                    continue
+                if isinstance(memory, bytes):
+                    memory = int.from_bytes(memory, "little")
+                adapters.append({"name": str(name), "pci": str(pci).lower(), "memory": memory})
+    except OSError:
+        pass
+    return adapters
+
+
+def _windows_amd_gpu() -> tuple[str, int | None, str | None] | None:
+    """The AMD GPU on Windows as (name, VRAM in MiB, ROCm target); None without one."""
+    amd = [a for a in _windows_display_adapters() if "ven_1002" in a["pci"]]
+    if not amd:
+        return None
+    gpu = max(amd, key=lambda a: a["memory"] or 0)
+    memory = int(gpu["memory"] // (1024 * 1024)) if gpu["memory"] else None
+    return gpu["name"], memory, rocm_target_for(gpu["name"])
+
+
+def rocm_target_for(name: str) -> str | None:
+    """The target AMD's Windows wheels are built for, from the adapter name."""
+    for pattern, target in ROCM_WINDOWS_TARGETS:
+        if re.search(pattern, name):
+            return target
+    return None
+
+
+def rocm_target() -> str | None:
+    """The ROCm target to install for: the configured one, else the detected one (Windows only)."""
+    override = read_config().get("rocm_target")
+    if override:
+        return str(override)
+    if sys.platform == "win32":
+        found = _windows_amd_gpu()
+        return found[2] if found else None
+    return None
 
 
 def read_config() -> dict:
@@ -84,12 +188,14 @@ def chosen_flavor() -> tuple[str, str]:
 
 def torch_state() -> dict:
     """What the installed torch can do. Empty values when torch is not installed."""
-    state = {"version": None, "cuda": False, "mps": False, "device_name": None}
+    state = {"version": None, "hip": None, "cuda": False, "mps": False, "device_name": None}
     try:
         import torch
     except ImportError:
         return state
     state["version"] = torch.__version__
+    # ROCm builds report themselves as CUDA; this is how to tell them apart
+    state["hip"] = getattr(torch.version, "hip", None)
     try:
         state["cuda"] = bool(torch.cuda.is_available())
         if state["cuda"]:
@@ -175,6 +281,7 @@ class SystemInfo:
     flavor: str
     flavor_source: str
     torch_index: str | None
+    rocm_target: str | None = None
     torch: dict = field(default_factory=dict)
     onnxruntime: dict = field(default_factory=dict)
     ffmpeg: str | None = None
@@ -201,7 +308,8 @@ def system_info() -> SystemInfo:
         detected_flavor=detected,
         flavor=flavor,
         flavor_source=source,
-        torch_index=TORCH_INDEX[flavor],
+        torch_index=torch_index(flavor),
+        rocm_target=rocm_target() if flavor == "rocm" else None,
         torch=torch_state(),
         onnxruntime=onnx_state(),
         ffmpeg=audio.find_ffmpeg(),
