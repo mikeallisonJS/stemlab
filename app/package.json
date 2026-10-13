@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.main.json",
     "test": "vitest run",
     "prepare:engine": "node scripts/prepare-engine.mjs",
-    "dist": "pnpm build && pnpm build:main && pnpm prepare:engine && electron-builder --publish never"
+    "dist": "pnpm build && pnpm build:main && pnpm prepare:engine && electron-builder --config electron-builder.cjs --publish never"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
@@ -31,46 +31,5 @@
     "vite": "^7.0.0",
     "vitest": "^3.0.0",
     "wavesurfer.js": "^7.12.0"
-  },
-  "build": {
-    "appId": "dev.captainstems.app",
-    "productName": "CaptainStems",
-    "directories": {
-      "output": "release",
-      "buildResources": "build/resources"
-    },
-    "files": [
-      "dist-electron/**",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "build/engine",
-        "to": "engine"
-      }
-    ],
-    "asar": true,
-    "win": {
-      "target": [
-        "nsis"
-      ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "deleteAppDataOnUninstall": false
-    },
-    "linux": {
-      "target": [
-        "AppImage"
-      ],
-      "category": "AudioVideo"
-    },
-    "mac": {
-      "target": [
-        "dmg"
-      ],
-      "category": "public.app-category.music"
-    }
   }
 }

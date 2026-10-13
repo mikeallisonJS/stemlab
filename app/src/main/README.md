@@ -41,4 +41,27 @@ Environment variables, all optional:
     CAPTAINSTEMS_ENGINE   the engine folder to use (default: resources/engine) and
     CAPTAINSTEMS_DATA     the user data folder to use
 
-Not done yet: code signing, and auto-update.
+### Windows code signing
+
+Optional, and switched on by secrets alone. The release workflow signs with
+Azure Artifact Signing (formerly Trusted Signing) through electron-builder,
+using the same six repository secrets as Cadent's installer workflow, so the
+signing account, app registration and certificate profile set up there serve
+this app too:
+
+    AZURE_SIGN_TENANT_ID      the Entra tenant holding the signing identity
+    AZURE_SIGN_CLIENT_ID      app registration with the Code Signing Certificate Profile Signer role
+    AZURE_SIGN_CLIENT_SECRET  its client secret
+    AZURE_SIGN_ENDPOINT       regional URI, e.g. https://eus.codesigning.azure.net/
+    AZURE_SIGN_ACCOUNT        Artifact Signing account name
+    AZURE_SIGN_PROFILE        certificate profile name within that account
+
+None set: an unsigned build that runs, with a SmartScreen warning on first
+launch. All six: every `.exe` in the app and the installer are signed and
+timestamped, and the workflow verifies the installer's signature. A partial set
+fails the build. `electron-builder.cjs` holds the rule; to sign a local build,
+export the three `AZURE_*` variables and the three `CAPTAINSTEMS_SIGN_*` ones it
+documents, on a machine with PowerShell (the TrustedSigning module is installed
+on first use).
+
+Not done yet: macOS signing and notarization, auto-update, an app icon.
