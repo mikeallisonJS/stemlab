@@ -48,6 +48,13 @@ function windowsSigning() {
   };
 }
 
+// Auto-update: the app checks this folder for latest.yml (latest-linux.yml,
+// latest-mac.yml) and downloads the installer named there. The release
+// workflow uploads them to Cloudflare R2 behind this host, the same bucket
+// and secrets as Cadent. The repository is private, so GitHub releases
+// cannot serve the feed (that would need a token inside the app).
+const UPDATE_URL = process.env.CAPTAINSTEMS_UPDATE_URL || "https://downloads.mikeallisonjs.com/captainstems";
+
 module.exports = {
   appId: "dev.captainstems.app",
   productName: "CaptainStems",
@@ -56,8 +63,11 @@ module.exports = {
   // The engine: the wheel, recipes, MSST, the built UI and FFmpeg (scripts/prepare-engine.mjs)
   extraResources: [{ from: "build/engine", to: "engine" }],
   asar: true,
+  // Written into resources/app-update.yml for electron-updater; uploads are the workflow's job
+  publish: [{ provider: "generic", url: UPDATE_URL, channel: "latest" }],
   win: {
     target: ["nsis"],
+    artifactName: "CaptainStems-Setup-${version}.${ext}",
     ...windowsSigning(),
   },
   nsis: {
@@ -65,6 +75,7 @@ module.exports = {
     allowToChangeInstallationDirectory: true,
     deleteAppDataOnUninstall: false,
   },
-  linux: { target: ["AppImage"], category: "AudioVideo" },
-  mac: { target: ["dmg"], category: "public.app-category.music" },
+  linux: { target: ["AppImage"], artifactName: "CaptainStems-${version}.${ext}", category: "AudioVideo" },
+  // The zip is what electron-updater downloads on macOS; the dmg is for people
+  mac: { target: ["dmg", "zip"], artifactName: "CaptainStems-${version}.${ext}", category: "public.app-category.music" },
 };

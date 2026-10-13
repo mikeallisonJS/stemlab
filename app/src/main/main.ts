@@ -16,6 +16,7 @@ import net from "node:net";
 import path from "node:path";
 
 import { BrowserWindow, app, dialog, ipcMain, shell } from "electron";
+import { type UpdateInfo, autoUpdater } from "electron-updater";
 
 import loadingHtml from "./loading.html";
 import type { ShellState } from "./preload";
@@ -311,7 +312,7 @@ function showMain(url: string, api: string): BrowserWindow {
       preload: PRELOAD,
       contextIsolation: true,
       sandbox: true,
-      additionalArguments: [`--captainstems-api=${api}`],
+      additionalArguments: [`--captainstems-api=${api}`, `--captainstems-version=${app.getVersion()}`],
     },
   });
   win.webContents.setWindowOpenHandler(({ url: target }) => {
@@ -340,6 +341,67 @@ function showMain(url: string, api: string): BrowserWindow {
   void win.loadURL(url);
   return win;
 }
+
+// Updates ---------------------------------------------------------------------
+//
+// electron-updater against the feed named in resources/app-update.yml
+// (electron-builder.cjs). Checked after the window opens and every few hours;
+// downloads happen in the background and the user is asked before a restart.
+// In a development checkout there is no feed and nothing is checked.
+
+export interface UpdateStatus {
+  state: "disabled" | "checking" | "none" | "available" | "downloaded" | "error";
+  version?: string;
+  message?: string;
+}
+
+let updateStatus: UpdateStatus = { state: app.isPackaged ? "none" : "disabled" };
+
+async function checkForUpdates(): Promise<UpdateStatus> {
+  if (!app.isPackaged) return updateStatus;
+  try {
+    await autoUpdater.checkForUpdates();
+  } catch (error) {
+    updateStatus = { state: "error", message: (error as Error).message };
+  }
+  return updateStatus;
+}
+
+function offerRestart(info: UpdateInfo): void {
+  if (!main || main.isDestroyed()) return;
+  void dialog
+    .showMessageBox(main, {
+      type: "info",
+      buttons: ["Restart now", "Later"],
+      defaultId: 0,
+      cancelId: 1,
+      message: `CaptainStems ${info.version} is ready`,
+      detail: "The update is installed when the app restarts. Later installs it on the next quit.",
+    })
+    .then(({ response }) => {
+      if (response === 0) autoUpdater.quitAndInstall();
+    });
+}
+
+function setupUpdates(): void {
+  if (!app.isPackaged) return;
+  const log = (level: string) => (message: unknown) => logLine(`update ${level}: ${String(message)}`);
+  autoUpdater.logger = { info: log("info"), warn: log("warn"), error: log("error"), debug: () => undefined };
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on("checking-for-update", () => (updateStatus = { state: "checking" }));
+  autoUpdater.on("update-available", (info) => (updateStatus = { state: "available", version: info.version }));
+  autoUpdater.on("update-not-available", (info) => (updateStatus = { state: "none", version: info.version }));
+  autoUpdater.on("error", (error) => (updateStatus = { state: "error", message: error.message }));
+  autoUpdater.on("update-downloaded", (info) => {
+    updateStatus = { state: "downloaded", version: info.version };
+    offerRestart(info);
+  });
+  void checkForUpdates();
+  setInterval(() => void checkForUpdates(), 4 * 60 * 60 * 1000);
+}
+
+ipcMain.handle("update:check", () => checkForUpdates());
 
 // Startup ---------------------------------------------------------------------
 
@@ -414,6 +476,7 @@ async function start(): Promise<void> {
       if (choice !== "retry") return;
     }
   }
+  setupUpdates();
 }
 
 /**

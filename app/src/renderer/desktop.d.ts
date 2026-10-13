@@ -5,6 +5,8 @@ interface CaptainStemsShell {
   pathForFile: (file: File) => string;
   /** Run `captainstems bootstrap` and restart the server; the shell shows its progress */
   bootstrap: () => void;
+  version?: string;
+  checkForUpdates: () => Promise<{ state: string; version?: string; message?: string }>;
 }
 
 interface Window {

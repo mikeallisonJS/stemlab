@@ -187,6 +187,7 @@ th, td { text-align: left; padding: 5px 10px; border-bottom: 1px solid var(--lin
 .doctor .banner { margin: 10px 0; }
 .doctor .banner button { margin-top: 6px; }
 .doctor pre { margin: 6px 0 0; white-space: pre-wrap; font-size: 11px; color: var(--muted); }
+.updates { margin-top: 14px; }
 .models th { color: var(--muted); font-weight: normal; }
 .add-model { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
 .add-model .wide { grid-column: span 2; }

@@ -174,7 +174,8 @@ The server listens on the local machine only and has no authentication. The desk
 spawns it on a free port, offers to run `bootstrap` on the first start and stops it on exit. `cd app && pnpm dist`
 builds the installer (NSIS, AppImage or dmg): the installed app creates its own Python environment with uv on
 the first start, so the installer stays small and one build serves every GPU. Pushing a `v*` tag builds all
-three on GitHub Actions.
+three on GitHub Actions, signs the Windows build when the signing secrets are set, and publishes the
+auto-update feed the installed apps poll (`app/src/main/README.md`).
 
 ## Development
 

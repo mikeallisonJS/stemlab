@@ -17,6 +17,30 @@ function size(bytes: number | undefined): string {
 const EMPTY = { id: "", backend: "msst", arch: "", config: "", weights: "", stems: "", license: "", notes: "" };
 const FLAVORS = ["cuda", "rocm", "mps", "cpu"];
 
+/** Desktop app only: its version and a manual update check (checks also run on their own). */
+function Updates({ shell }: { shell: CaptainStemsShell }) {
+  const [result, setResult] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const check = async () => {
+    setBusy(true);
+    const status = await shell.checkForUpdates();
+    setResult(
+      status.state === "disabled" ? "Updates are not checked in a development build."
+        : status.state === "none" ? "Up to date."
+        : status.state === "available" ? `Downloading ${status.version}...`
+        : status.state === "downloaded" ? `${status.version} is downloaded and installs on restart.`
+        : status.state === "error" ? `Could not check: ${status.message}`
+        : "Checking...",
+    );
+    setBusy(false);
+  };
+  return (
+    <p className="muted updates">
+      Desktop app {shell.version ?? ""} · <button className="small" disabled={busy} onClick={check}>Check for updates</button> {result}
+    </p>
+  );
+}
+
 /** The Doctor part of the view: override what was detected, then (re)install the libraries for it. */
 function Doctor({ system, onChanged }: { system: SystemInfo; onChanged: () => void }) {
   const [flavor, setFlavor] = useState(system.flavor_source === "override" ? system.flavor : "auto");
@@ -158,6 +182,7 @@ export function ModelsView({ system, models, onChanged }: Props) {
           </table>
         ) : <p className="muted">Loading...</p>}
         {system && <Doctor key={`${system.flavor}:${system.flavor_source}:${system.rocm_target ?? ""}`} system={system} onChanged={onChanged} />}
+        {window.captainstems && <Updates shell={window.captainstems} />}
       </section>
 
       <section>

@@ -21,6 +21,18 @@ name: Release
 # installs the TrustedSigning PowerShell module on the runner and signs every
 # .exe in the app plus the installer, timestamped, so the signatures outlive
 # the short-lived certificate. macOS builds are unsigned for now.
+#
+# Tag builds also publish the auto-update feed - the installers, their
+# blockmaps and latest*.yml - to Cloudflare R2, gated the same way on the five
+# secrets Cadent's workflow uses for the same bucket. The installed app checks
+# https://<R2_PUBLIC_HOST>/captainstems/ (app/electron-builder.cjs), which
+# must be a custom domain on the bucket: Cloudflare rate-limits r2.dev.
+#
+#   R2_ACCOUNT_ID         Cloudflare account id (the r2.cloudflarestorage host)
+#   R2_ACCESS_KEY_ID      R2 API token, Object Read & Write on the bucket
+#   R2_SECRET_ACCESS_KEY  its secret
+#   R2_BUCKET             bucket name, shared across apps; this writes under captainstems/
+#   R2_PUBLIC_HOST        custom domain on the bucket, e.g. downloads.example.com
 on:
   push:
     tags:
@@ -129,7 +141,63 @@ jobs:
             app/release/*.exe
             app/release/*.AppImage
             app/release/*.dmg
+            app/release/*.zip
+            app/release/*.blockmap
+            app/release/latest*.yml
           if-no-files-found: error
+
+      - name: Publish the auto-update feed to R2
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        working-directory: app/release
+        env:
+          # R2 speaks S3, so the AWS CLI on the runner drives it
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          # AWS CLI v2.23+ sends a CRC32 checksum header R2 does not implement
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PUBLIC_HOST: ${{ secrets.R2_PUBLIC_HOST }}
+        run: |
+          # Same three-state gate as signing: none skips, partial fails, all five publish.
+          present=0
+          for value in "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" "$R2_ACCOUNT_ID" "$R2_BUCKET" "$R2_PUBLIC_HOST"; do
+            [ -n "$value" ] && present=$((present + 1))
+          done
+          if [ "$present" -eq 0 ]; then
+            echo "No R2 secrets - the release has the installers, but installed apps will find no update feed."
+            exit 0
+          fi
+          if [ "$present" -ne 5 ]; then
+            echo "::error::Publishing the update feed needs all five R2_* secrets - $((5 - present)) of them are unset."
+            exit 1
+          fi
+          endpoint="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          # Installers and blockmaps carry the version in their name and never change:
+          # a rerun of a published tag fails here instead of swapping bytes under a URL
+          # an installed app may already be downloading.
+          for file in *.exe *.AppImage *.dmg *.zip *.blockmap; do
+            [ -e "$file" ] || continue
+            aws s3api put-object --bucket "$R2_BUCKET" --key "captainstems/$file" --body "$file"               --if-none-match '*' --content-type application/octet-stream --endpoint-url "$endpoint"
+          done
+          # latest*.yml is the pointer the apps poll, and the one file that is overwritten
+          for file in latest*.yml; do
+            [ -e "$file" ] || continue
+            aws s3api put-object --bucket "$R2_BUCKET" --key "captainstems/$file" --body "$file"               --content-type text/yaml --cache-control "max-age=300" --endpoint-url "$endpoint"
+          done
+          for file in latest*.yml; do
+            [ -e "$file" ] || continue
+            url="https://$R2_PUBLIC_HOST/captainstems/$file"
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-redirs 0 "$url")
+            if [ "$code" != "200" ]; then
+              echo "::error::$url answered $code, not 200 - is the custom domain attached to the bucket?"
+              exit 1
+            fi
+            echo "Update feed: $url"
+          done
 
   release:
     needs: build

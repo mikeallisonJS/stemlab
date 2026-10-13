@@ -68,4 +68,25 @@ export the three `AZURE_*` variables and the three `CAPTAINSTEMS_SIGN_*` ones it
 documents, on a machine with PowerShell (the TrustedSigning module is installed
 on first use).
 
-Not done yet: macOS signing and notarization, auto-update, an app icon.
+### Auto-update
+
+The installed app checks an update feed after the window opens and every
+four hours, downloads a newer version in the background and asks before
+restarting; "Later" installs it on the next quit. The Models view shows the
+app's version and a manual check. Nothing is checked from a checkout.
+
+The feed is a folder of files electron-builder writes beside the installers:
+`latest.yml` (`latest-linux.yml`, `latest-mac.yml`) naming the newest version,
+the installers and their `.blockmap` files for differential downloads.
+`electron-builder.cjs` bakes the folder's URL into the app
+(`CAPTAINSTEMS_UPDATE_URL`, default `https://downloads.mikeallisonjs.com/captainstems`),
+and the release workflow uploads the files there on a `v*` tag: Cloudflare R2
+behind that custom domain, using the same five `R2_*` secrets as Cadent. The
+repository is private, so GitHub releases cannot serve the feed. Installers
+are written once per version; only `latest*.yml` is overwritten.
+
+macOS: updates need a signed and notarized app, which is not set up, so the
+check reports an error there until it is. Windows updates are verified
+against the running app's signature once signing is configured.
+
+Not done yet: macOS signing and notarization, an app icon.
