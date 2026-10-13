@@ -213,7 +213,7 @@
       "config": "config.yaml",
       "weights": "model.ckpt",
       "license": "not stated (distributed in the releases of the MIT-licensed MSST repository)",
-      "notes": "4 stem SCNet; strong drums (SDR 11.15 on MUSDB)",
+      "notes": "4 stem SCNet; strong drums (SDR 11.15 on MUSDB). Superseded by scnet-xl-ihf",
       "stems": [
         "drums",
         "bass",
@@ -287,6 +287,202 @@
           "url": "https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/Kim_Vocal_2.onnx",
           "sha256": "ce74ef3b6a6024ce44211a07be9cf8bc6d87728cc852a68ab34eb8e58cde9c8b",
           "size": 66759214
+        }
+      ]
+    },
+    {
+      "id": "mel-band-roformer-deux",
+      "name": "Mel-Band RoFormer Deux (becruily)",
+      "backend": "msst",
+      "arch": "mel_band_roformer",
+      "config": "config.yaml",
+      "weights": "model.ckpt",
+      "license": "CC-BY-NC-4.0 (as published on Hugging Face)",
+      "notes": "becruily's dual vocals + instrumental model; SDR 11.37 vocals / 17.55 instrumental on MVSEP multisong, the best all-rounder of 2026. Both outputs come from one pass",
+      "defaults": {
+        "overlap": 4
+      },
+      "stems": [
+        "vocals",
+        "instrumental"
+      ],
+      "config_stems": [
+        "Vocals",
+        "Instrumental"
+      ],
+      "sample_rate": 44100,
+      "files": [
+        {
+          "name": "config.yaml",
+          "url": "https://huggingface.co/becruily/mel-band-roformer-deux/resolve/main/config_deux_becruily.yaml",
+          "sha256": "bb3ea9bce37ca96d63568490d5a92d7e41df3d7726788b6970c10d89eb62d902",
+          "size": 1175
+        },
+        {
+          "name": "model.ckpt",
+          "url": "https://huggingface.co/becruily/mel-band-roformer-deux/resolve/main/becruily_deux.ckpt",
+          "sha256": "10255c02295bf3e3865d4ee50ff752d7b19b124ed5fd93b147babc4333eda3aa",
+          "size": 435006815
+        }
+      ]
+    },
+    {
+      "id": "bs-roformer-resurrection",
+      "name": "BS-RoFormer Resurrection (unwa)",
+      "backend": "msst",
+      "arch": "bs_roformer",
+      "config": "config.yaml",
+      "weights": "model.ckpt",
+      "license": "not stated (as published on Hugging Face)",
+      "notes": "unwa's vocal model; instrumental SDR 17.25 on MVSEP multisong via subtraction. Clean on quiet passages and solo piano",
+      "defaults": {
+        "overlap": 4
+      },
+      "stems": [
+        "vocals"
+      ],
+      "sample_rate": 44100,
+      "files": [
+        {
+          "name": "config.yaml",
+          "url": "https://huggingface.co/pcunwa/BS-Roformer-Resurrection/resolve/main/BS-Roformer-Resurrection-Config.yaml",
+          "sha256": "79c65b6158c8e9236c9f02247cbb2fb6eb0007c42c47799e9de8e86f474556c6",
+          "size": 2633
+        },
+        {
+          "name": "model.ckpt",
+          "url": "https://huggingface.co/pcunwa/BS-Roformer-Resurrection/resolve/main/BS-Roformer-Resurrection.ckpt",
+          "sha256": "9dbfe5cb572e4ed32a15ec727d7bd06c8d7aba97509e6fda5bc008bb1e0b2dd5",
+          "size": 204510749
+        }
+      ]
+    },
+    {
+      "id": "bs-roformer-resurrection-inst",
+      "name": "BS-RoFormer Resurrection Instrumental (unwa)",
+      "backend": "msst",
+      "arch": "bs_roformer",
+      "config": "config.yaml",
+      "weights": "model.ckpt",
+      "license": "not stated (as published on Hugging Face)",
+      "notes": "The instrumental-trained twin of bs-roformer-resurrection: fuller than subtracting the vocal model, for when the instrumental is what you keep",
+      "defaults": {
+        "overlap": 4
+      },
+      "stems": [
+        "instrumental"
+      ],
+      "config_stems": [
+        "other"
+      ],
+      "sample_rate": 44100,
+      "files": [
+        {
+          "name": "config.yaml",
+          "url": "https://huggingface.co/pcunwa/BS-Roformer-Resurrection/resolve/main/BS-Roformer-Resurrection-Inst-Config.yaml",
+          "sha256": "0c67e988e1d608a4d3414f602dd3593ec927913c60618d1ff981baec40455cb0",
+          "size": 2632
+        },
+        {
+          "name": "model.ckpt",
+          "url": "https://huggingface.co/pcunwa/BS-Roformer-Resurrection/resolve/main/BS-Roformer-Resurrection-Inst.ckpt",
+          "sha256": "16311025a5133ae6411760ccfe9e3e66b31a01d9d8bec0a03fa7ec4bedac7a15",
+          "size": 204483033
+        }
+      ]
+    },
+    {
+      "id": "scnet-xl-ihf",
+      "name": "SCNet XL IHF (ZFTurbo)",
+      "backend": "msst",
+      "arch": "scnet",
+      "config": "config.yaml",
+      "weights": "model.ckpt",
+      "license": "not stated (distributed in the releases of the MIT-licensed MSST repository)",
+      "notes": "4 stem SCNet XL tuned for the high frequencies; SDR 10.09 average on MUSDB18, drums 11.82. Supersedes scnet-large on every stem",
+      "stems": [
+        "drums",
+        "bass",
+        "other",
+        "vocals"
+      ],
+      "sample_rate": 44100,
+      "files": [
+        {
+          "name": "config.yaml",
+          "url": "https://github.com/ZFTurbo/Music-Source-Separation-Training/releases/download/v1.0.15/config_musdb18_scnet_xl_more_wide_v5.yaml",
+          "sha256": "54ddcb8aeeae85c8d0e148741e7d87b0fbd38bd21cffa5d59ba124fe1e672f40",
+          "size": 5906
+        },
+        {
+          "name": "model.ckpt",
+          "url": "https://github.com/ZFTurbo/Music-Source-Separation-Training/releases/download/v1.0.15/model_scnet_ep_36_sdr_10.0891.ckpt",
+          "sha256": "ac25975f0f5704f3d1a3c3c251505b7a0f417a22eafe82773440ee4f7e14b74f",
+          "size": 214063778
+        }
+      ]
+    },
+    {
+      "id": "denoise-mel-roformer",
+      "name": "Mel-Band RoFormer Denoise (aufr33)",
+      "backend": "msst",
+      "arch": "mel_band_roformer",
+      "config": "config.yaml",
+      "weights": "model.ckpt",
+      "license": "not stated (aufr33's model, mirrored on Hugging Face by poiqazwsx)",
+      "notes": "Removes noise and bleed from a stem, usually a vocal; SDR 27.99. Chain it after separation and before dereverb",
+      "stems": [
+        "dry"
+      ],
+      "sample_rate": 44100,
+      "files": [
+        {
+          "name": "config.yaml",
+          "url": "https://huggingface.co/poiqazwsx/melband-roformer-denoise/resolve/main/model_mel_band_roformer_denoise.yaml",
+          "sha256": "4ed1e51a5af5013d705710b31d8d56a8c66d24f385a12155a1ab255c2d51cd5c",
+          "size": 1621
+        },
+        {
+          "name": "model.ckpt",
+          "url": "https://huggingface.co/poiqazwsx/melband-roformer-denoise/resolve/main/denoise_mel_band_roformer_aufr33_sdr_27.9959.ckpt",
+          "sha256": "7c1c39191edc34e942ca7f2346ce6b6c0e1208a5f76349ffce6f696bd12910de",
+          "size": 913097300
+        }
+      ]
+    },
+    {
+      "id": "mel-band-roformer-karaoke",
+      "name": "Mel-Band RoFormer Karaoke (becruily)",
+      "backend": "msst",
+      "arch": "mel_band_roformer",
+      "config": "config.yaml",
+      "weights": "model.ckpt",
+      "license": "not stated (as published on Hugging Face)",
+      "notes": "Lead vocal against everything else, backing vocals included: feed it a vocal stem to split lead from backing, or the mix for a karaoke track that keeps the harmonies. 1.7 GB",
+      "defaults": {
+        "overlap": 4
+      },
+      "stems": [
+        "vocals",
+        "instrumental"
+      ],
+      "config_stems": [
+        "Vocals",
+        "Instrumental"
+      ],
+      "sample_rate": 44100,
+      "files": [
+        {
+          "name": "config.yaml",
+          "url": "https://huggingface.co/becruily/mel-band-roformer-karaoke/resolve/main/config_karaoke_becruily.yaml",
+          "sha256": "cd37b0dcc285fc22d88090415722ac7127ee1d9ea2f3346c3b8d8fcc61e0c74b",
+          "size": 1724
+        },
+        {
+          "name": "model.ckpt",
+          "url": "https://huggingface.co/becruily/mel-band-roformer-karaoke/resolve/main/mel_band_roformer_karaoke_becruily.ckpt",
+          "sha256": "d3aa262ac01df870b9fc033e9c7b6cad33fe04fc9c148b6c40841326a515a0e0",
+          "size": 1719139254
         }
       ]
     }

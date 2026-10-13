@@ -154,6 +154,24 @@ def curated(tmp_path, monkeypatch):
     return entry
 
 
+def test_manifest_can_name_stems_differently_from_the_config():
+    # A model's config may call its outputs "Instrumental" or "other"; recipes use the manifest's names
+    manifest = Manifest(
+        id="deux",
+        backend="msst",
+        arch="mel_band_roformer",
+        config="c.yaml",
+        weights="w.ckpt",
+        stems=["vocals", "instrumental"],
+        config_stems=["Vocals", "Instrumental"],
+    )
+    assert manifest.config_stems == ["Vocals", "Instrumental"]
+    assert (
+        Manifest(id="plain", backend="msst", arch="x", config="c.yaml", weights="w.ckpt", stems=["a"]).config_stems
+        is None
+    )
+
+
 def test_fetch_downloads_verifies_and_installs(home, curated):
     seen = []
     model = Registry().fetch("curated-model", progress=lambda name, done, total: seen.append(name))

@@ -390,9 +390,12 @@ class MsstBackend(Backend):
             ) from None
         model.eval().to(params["device"])
 
-        stems = list(prefer_target_instrument(config))
-        if stems != list(info.stems):
-            raise BackendError(f"MSST model '{info.id}' produces {stems}, but its manifest lists {info.stems}")
+        produced = [str(stem) for stem in prefer_target_instrument(config)]
+        expected = list(info.config_stems or info.stems)
+        if [stem.lower() for stem in produced] != [stem.lower() for stem in expected]:
+            raise BackendError(f"MSST model '{info.id}' produces {produced}, but its manifest lists {expected}")
+        # Outputs go by the manifest's names: the config's can be capitalised or vague ("other")
+        stems = list(info.stems)
         sample_rate = (
             int(getattr(config.audio, "sample_rate", info.sample_rate))
             if "audio" in config

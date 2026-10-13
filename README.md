@@ -115,9 +115,17 @@ weights. Set `CAPTAINSTEMS_HOME` to move everything CaptainStems stores.
 
 ```
 uv run captainstems models list
-uv run captainstems models fetch mel-band-roformer-vocals-kim scnet-large
+uv run captainstems models fetch mel-band-roformer-deux scnet-xl-ihf
 uv run captainstems models verify
 ```
+
+The curated list (`captainstems models list`) holds, as of October 2026: becruily's Mel-Band RoFormer Deux
+(vocals and instrumental in one pass, the best all-rounder), unwa's BS-RoFormer Resurrection (vocal and
+instrumental variants), Kim's and viperx's older vocal models, SCNet XL IHF and HT Demucs for 4 and 6 stems,
+and single-purpose models for dereverb, denoise and karaoke (lead against backing vocals). The
+`vocals-ensemble` recipe averages three vocal models, which is how the leaderboard results are made.
+Some weights are non-commercial (Deux is CC-BY-NC-4.0) and several community checkpoints state no licence;
+each manifest records what its publisher says.
 
 `fetch` downloads curated models from their publishers and verifies them by SHA-256. Weights are never
 part of this repository and carry their own licenses, shown in `models list --json` and in the UI.

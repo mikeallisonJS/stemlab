@@ -53,6 +53,9 @@ class Manifest(BaseModel):
     sha256: str | dict[str, str] | None = None
     #: The model's native output order
     stems: list[str] = Field(min_length=1)
+    #: What the model's own config calls those outputs, when the manifest names them
+    #: differently (e.g. "Instrumental" -> instrumental, "other" -> instrumental)
+    config_stems: list[str] | None = None
     sample_rate: int = 44100
     #: Seed the knobs of nodes using this model
     defaults: dict[str, Any] = Field(default_factory=dict)
