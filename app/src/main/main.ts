@@ -5,6 +5,8 @@
 // Where the Python environment comes from, in order:
 //   CAPTAINSTEMS_API     an already running server; nothing is spawned
 //   CAPTAINSTEMS_PYTHON  a python interpreter with captainstems installed
+//   packaged app         its own environment under the user data folder,
+//                        created on the first start (python.ts)
 //   <repo>/.venv         the development environment made by `uv sync`
 //   uv                   `uv run captainstems serve` in the repository
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
@@ -17,18 +19,12 @@ import { BrowserWindow, app, dialog, ipcMain, shell } from "electron";
 
 import loadingHtml from "./loading.html";
 import type { ShellState } from "./preload";
+import { type Python, managedPython } from "./python";
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
-const UI_DIST = path.join(REPO_ROOT, "app", "dist");
 const PRELOAD = path.join(__dirname, "preload.cjs");
 const DEV_UI = "http://localhost:5173/";
 const LOG_LINES = 400;
-
-interface Python {
-  command: string;
-  args: string[];
-  describe: string;
-}
 
 let server: ChildProcess | null = null;
 let apiUrl: string | null = null;
@@ -51,6 +47,10 @@ function logLine(line: string): void {
 
 function setState(state: ShellState): void {
   loading?.webContents.send("state", state);
+}
+
+function status(message: string): void {
+  setState({ phase: "starting", message, actions: [] });
 }
 
 function showLoading(): BrowserWindow {
@@ -78,6 +78,9 @@ function showLoading(): BrowserWindow {
 function ask(message: string, actions: ShellState["actions"], phase: ShellState["phase"] = "error") {
   return new Promise<ShellState["actions"][number]>((resolve) => {
     setState({ phase, message, actions });
+    // Smoke-test aid: answer every question with this action, when it is offered
+    const scripted = process.env.CAPTAINSTEMS_DEBUG_ANSWER as ShellState["actions"][number] | undefined;
+    if (scripted && actions.includes(scripted)) return resolve(scripted);
     pendingAction = resolve;
   });
 }
@@ -91,17 +94,44 @@ ipcMain.on("action", (_event, name: ShellState["actions"][number]) => {
 
 // The Python environment ------------------------------------------------------
 
-function findPython(): Python | null {
+/** Managed environment: the packaged app, or CAPTAINSTEMS_MANAGED=1 to try it from a checkout. */
+function managed(): boolean {
+  return app.isPackaged || Boolean(process.env.CAPTAINSTEMS_MANAGED);
+}
+
+/** The engine resources: the wheel, recipes, MSST and the built UI (see scripts/prepare-engine.mjs). */
+function engineDir(): string {
+  return process.env.CAPTAINSTEMS_ENGINE ?? path.join(process.resourcesPath, "engine");
+}
+
+function developmentPython(): Python | null {
   const explicit = process.env.CAPTAINSTEMS_PYTHON;
-  if (explicit) return { command: explicit, args: ["-m", "captainstems"], describe: explicit };
+  if (explicit) return { command: explicit, args: ["-m", "captainstems"], describe: explicit, root: REPO_ROOT, env: {} };
   const venv = path.join(REPO_ROOT, ".venv", process.platform === "win32" ? "Scripts\\python.exe" : "bin/python");
-  if (fs.existsSync(venv)) return { command: venv, args: ["-m", "captainstems"], describe: venv };
+  if (fs.existsSync(venv)) return { command: venv, args: ["-m", "captainstems"], describe: venv, root: REPO_ROOT, env: {} };
   const uv = spawnSync(process.platform === "win32" ? "where" : "which", ["uv"], { encoding: "utf8" });
   if (uv.status === 0 && uv.stdout.trim()) {
     const binary = uv.stdout.trim().split(/\r?\n/)[0];
-    return { command: binary, args: ["run", "--project", REPO_ROOT, "captainstems"], describe: "uv run captainstems" };
+    return {
+      command: binary,
+      args: ["run", "--project", REPO_ROOT, "captainstems"],
+      describe: "uv run captainstems",
+      root: REPO_ROOT,
+      env: {},
+    };
   }
   return null;
+}
+
+async function findPython(): Promise<Python> {
+  if (managed()) {
+    return managedPython(engineDir(), path.join(app.getPath("userData"), "python"), { log: logLine, status });
+  }
+  const python = developmentPython();
+  if (!python) {
+    throw new Error("No Python environment was found.\nRun `uv sync --extra server` in the repository (or install uv), then retry.");
+  }
+  return python;
 }
 
 function freePort(): Promise<number> {
@@ -146,6 +176,17 @@ function reachable(url: string): Promise<boolean> {
   });
 }
 
+function servesHtml(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const request = http.get(url, { timeout: 2000 }, (response) => {
+      response.resume();
+      resolve(response.statusCode === 200 && /text\/html/.test(response.headers["content-type"] ?? ""));
+    });
+    request.on("timeout", () => request.destroy());
+    request.on("error", () => resolve(false));
+  });
+}
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // The server ------------------------------------------------------------------
@@ -157,9 +198,16 @@ function pipe(child: ChildProcess): void {
   child.stderr?.on("data", logLine);
 }
 
-function pythonEnv(): NodeJS.ProcessEnv {
+function pythonEnv(python: Python): NodeJS.ProcessEnv {
   // Unbuffered, UTF-8 output so the log streams, and no colour codes in it
-  return { ...process.env, PYTHONUNBUFFERED: "1", PYTHONIOENCODING: "utf-8", NO_COLOR: "1", TERM: "dumb" };
+  return {
+    ...process.env,
+    PYTHONUNBUFFERED: "1",
+    PYTHONIOENCODING: "utf-8",
+    NO_COLOR: "1",
+    TERM: "dumb",
+    ...python.env,
+  };
 }
 
 async function startServer(python: Python): Promise<string> {
@@ -167,8 +215,8 @@ async function startServer(python: Python): Promise<string> {
   const url = `http://127.0.0.1:${port}`;
   logLine(`$ ${python.describe} serve --port ${port}`);
   server = spawn(python.command, [...python.args, "serve", "--port", String(port)], {
-    cwd: REPO_ROOT,
-    env: pythonEnv(),
+    cwd: python.root,
+    env: pythonEnv(python),
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
@@ -214,8 +262,8 @@ function runBootstrap(python: Python): Promise<number> {
   return new Promise((resolve) => {
     logLine(`$ ${python.describe} bootstrap`);
     const child = spawn(python.command, [...python.args, "bootstrap"], {
-      cwd: REPO_ROOT,
-      env: pythonEnv(),
+      cwd: python.root,
+      env: pythonEnv(python),
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     });
@@ -230,31 +278,21 @@ function runBootstrap(python: Python): Promise<number> {
 
 // The UI ----------------------------------------------------------------------
 
-async function uiUrl(api: string): Promise<string> {
+async function uiUrl(api: string, python: Python | null): Promise<string> {
   const override = process.env.ELECTRON_RENDERER_URL;
   if (override) return override;
   // Development: Vite's dev server with hot reload, when it is running
   if (!app.isPackaged && (await reachable(DEV_UI))) return DEV_UI;
-  // The server hosts app/dist, when it existed at its start
+  // Otherwise the server hosts app/dist, when it existed at its start
   if (!(await servesHtml(api + "/"))) {
+    const built = fs.existsSync(path.join(python?.root ?? REPO_ROOT, "app", "dist", "index.html"));
     throw new Error(
-      fs.existsSync(path.join(UI_DIST, "index.html"))
+      built
         ? `The server at ${api} does not host the UI (it was started before the UI was built). Restart it, or run \`pnpm dev\` in app/ and retry.`
         : "The UI is not built. Run `pnpm build` in app/ (or `pnpm dev` for hot reload) and retry.",
     );
   }
   return api + "/";
-}
-
-function servesHtml(url: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const request = http.get(url, { timeout: 2000 }, (response) => {
-      response.resume();
-      resolve(response.statusCode === 200 && /text\/html/.test(response.headers["content-type"] ?? ""));
-    });
-    request.on("timeout", () => request.destroy());
-    request.on("error", () => resolve(false));
-  });
 }
 
 function showMain(url: string, api: string): BrowserWindow {
@@ -305,22 +343,24 @@ function showMain(url: string, api: string): BrowserWindow {
 
 async function start(): Promise<void> {
   loading = showLoading();
-  setState({ phase: "starting", message: "Starting the server…", actions: [] });
+  status("Starting…");
 
+  let python: Python | null = null;
   const attach = process.env.CAPTAINSTEMS_API;
   if (attach) {
     logLine(`Using the server at ${attach} (CAPTAINSTEMS_API)`);
     apiUrl = attach.replace(/\/$/, "");
   } else {
-    const python = findPython();
-    if (!python) {
-      const choice = await ask(
-        "No Python environment was found.\nRun `uv sync --extra server` in the repository (or install uv), then retry.",
-        ["retry", "quit"],
-      );
-      if (choice === "retry") return start();
-      return;
+    while (!python) {
+      try {
+        python = await findPython();
+      } catch (error) {
+        logLine((error as Error).message);
+        const choice = await ask((error as Error).message, ["retry", "quit"]);
+        if (choice !== "retry") return;
+      }
     }
+    status("Starting the server…");
     while (!apiUrl) {
       try {
         apiUrl = await startServer(python);
@@ -349,7 +389,7 @@ async function start(): Promise<void> {
         continue;
       }
       // The server imports torch at startup: restart it to pick the libraries up
-      setState({ phase: "starting", message: "Restarting the server…", actions: [] });
+      status("Restarting the server…");
       stopServer();
       apiUrl = null;
       while (!apiUrl) {
@@ -365,14 +405,19 @@ async function start(): Promise<void> {
   }
 
   setState({ phase: "ready", message: "Loading the interface…", actions: [] });
-  try {
-    main = showMain(await uiUrl(apiUrl), apiUrl);
-  } catch (error) {
-    const choice = await ask((error as Error).message, ["retry", "quit"]);
-    if (choice === "retry") {
-      main = showMain(await uiUrl(apiUrl).catch(() => apiUrl + "/"), apiUrl);
+  while (!main) {
+    try {
+      main = showMain(await uiUrl(apiUrl, python), apiUrl);
+    } catch (error) {
+      const choice = await ask((error as Error).message, ["retry", "quit"]);
+      if (choice !== "retry") return;
     }
   }
+}
+
+if (process.env.CAPTAINSTEMS_DATA) {
+  // Testing aid: a user data folder other than the real one
+  app.setPath("userData", process.env.CAPTAINSTEMS_DATA);
 }
 
 if (!app.requestSingleInstanceLock()) {

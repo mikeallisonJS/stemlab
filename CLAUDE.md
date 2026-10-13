@@ -11,6 +11,7 @@ Power-user stem separation workbench. Python engine + CLI (`captainstems/`), Fas
 - `uv run pytest` — tests; `uv run ruff check .` — lint
 - `cd app && pnpm i && pnpm dev` — UI against a running server
 - `cd app && pnpm build && pnpm desktop` — the Electron app; it starts the server itself (`app/src/main/`)
+- `cd app && pnpm dist` — the installer; the installed app makes its own Python env with uv on first start
 
 ## Rules
 - Backends implement `captainstems/backends/base.py`; never call a backend from the UI or server directly, always through the runner.

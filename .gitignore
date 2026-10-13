@@ -10,6 +10,7 @@ __pycache__/
 dist/
 dist-electron/
 build/
+release/
 *.egg-info/
 
 # Virtual environments

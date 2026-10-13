@@ -300,6 +300,10 @@ class MsstBackend(Backend):
 
         _import_upstream()
         commit = "unknown"
+        stamp = paths.MSST_DIR / "COMMIT"
+        if stamp.is_file():
+            # The packaged app ships MSST without its .git; the build writes the commit here
+            return {"msst": stamp.read_text(encoding="utf-8").strip() or commit, "torch": torch.__version__}
         try:
             commit = (
                 subprocess.run(

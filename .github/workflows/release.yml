@@ -1,0 +1,82 @@
+name: Release
+
+# Builds the desktop app for each platform when a version tag is pushed and
+# attaches the installers to a GitHub release.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+          - os: ubuntu-latest
+            name: Linux
+          - os: macos-latest
+            name: macOS
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: astral-sh/setup-uv@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install FFmpeg (bundled into the app)
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then choco install ffmpeg -y --no-progress;
+          elif [ "$RUNNER_OS" = "macOS" ]; then brew install ffmpeg;
+          else sudo apt-get update && sudo apt-get install -y ffmpeg; fi
+
+      - name: Build
+        working-directory: app
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm dist
+        env:
+          # No publishing from the builder itself; the release step below uploads
+          ELECTRON_BUILDER_PUBLISH: never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CaptainStems-${{ matrix.name }}
+          path: |
+            app/release/*.exe
+            app/release/*.AppImage
+            app/release/*.dmg
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          draft: true
+          generate_release_notes: true

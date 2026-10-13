@@ -5,7 +5,14 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+# The repository, where the recipes, the MSST submodule and the built UI live.
+# The packaged app installs the engine as a wheel and ships those as resources:
+# it points CAPTAINSTEMS_ROOT at a folder laid out the same way.
+REPO_ROOT = (
+    Path(os.environ["CAPTAINSTEMS_ROOT"])
+    if os.environ.get("CAPTAINSTEMS_ROOT")
+    else Path(__file__).resolve().parent.parent
+)
 MSST_DIR = REPO_ROOT / "third_party" / "msst"
 
 

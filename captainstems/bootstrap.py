@@ -9,6 +9,7 @@ them with uv. The packaged app calls the same code on first run.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -52,8 +53,11 @@ def onnxruntime_package(flavor: str) -> str:
 
 
 def installer() -> list[str]:
-    """The command prefix that installs into the running environment."""
-    uv = shutil.which("uv")
+    """
+    The command prefix that installs into the running environment: uv when there
+    is one (the packaged app names its own in CAPTAINSTEMS_UV), else pip.
+    """
+    uv = os.environ.get("CAPTAINSTEMS_UV") or shutil.which("uv")
     if uv:
         return [uv, "pip", "install", "--python", sys.executable]
     return [sys.executable, "-m", "pip", "install"]

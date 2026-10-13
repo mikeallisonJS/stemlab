@@ -169,8 +169,10 @@ server then serves it.
 - **Models**: what the machine can run, fetch curated models, add your own.
 
 The server listens on the local machine only and has no authentication. The desktop app (`app/src/main/`)
-spawns it on a free port, offers to run `bootstrap` on the first start and stops it on exit; it still needs
-the repository's `.venv` or `uv`. Installers (electron-builder) are not done yet.
+spawns it on a free port, offers to run `bootstrap` on the first start and stops it on exit. `cd app && pnpm dist`
+builds the installer (NSIS, AppImage or dmg): the installed app creates its own Python environment with uv on
+the first start, so the installer stays small and one build serves every GPU. Pushing a `v*` tag builds all
+three on GitHub Actions.
 
 ## Development
 
