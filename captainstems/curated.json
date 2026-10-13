@@ -15,6 +15,10 @@
       ],
       "license": "MIT (Demucs repository)",
       "notes": "Hybrid Transformer Demucs, the 4 stem default",
+      "scores": {
+        "all": 9.0
+      },
+      "benchmark": "MUSDB HQ test set, trained with 800 extra songs (Demucs README)",
       "sample_rate": 44100,
       "files": [
         {
@@ -51,6 +55,10 @@
       ],
       "license": "MIT (Demucs repository)",
       "notes": "One fine-tuned network per stem; 4x the time of htdemucs",
+      "scores": {
+        "all": 9.0
+      },
+      "benchmark": "MUSDB HQ test set, trained with 800 extra songs (Demucs README)",
       "sample_rate": 44100,
       "files": [
         {
@@ -127,6 +135,10 @@
       "weights": "model.ckpt",
       "license": "MIT (as published on Hugging Face)",
       "notes": "KimberleyJensen's vocal model; SDR 10.98 on the MSST leaderboard. A good default for vocals",
+      "scores": {
+        "vocals": 10.98
+      },
+      "benchmark": "MSST leaderboard",
       "defaults": {
         "overlap": 4
       },
@@ -158,6 +170,11 @@
       "weights": "model.ckpt",
       "license": "not stated (hosted in UVR's model repository, which has no license file)",
       "notes": "viperx's ep_317 checkpoint, SDR 12.97 on vocals in UVR's ranking",
+      "scores": {
+        "vocals": 10.87,
+        "instrumental": 17.17
+      },
+      "benchmark": "MVSEP multisong leaderboard (viperx edition)",
       "stems": [
         "vocals"
       ],
@@ -186,6 +203,10 @@
       "weights": "model.ckpt",
       "license": "GPL-3.0 (as published on Hugging Face)",
       "notes": "Removes reverb from a vocal stem; SDR 19.17",
+      "scores": {
+        "noreverb": 19.17
+      },
+      "benchmark": "publisher's own test set",
       "stems": [
         "noreverb"
       ],
@@ -214,6 +235,10 @@
       "weights": "model.ckpt",
       "license": "not stated (distributed in the releases of the MIT-licensed MSST repository)",
       "notes": "4 stem SCNet; strong drums (SDR 11.15 on MUSDB). Superseded by scnet-xl-ihf",
+      "scores": {
+        "drums": 11.15
+      },
+      "benchmark": "MUSDB18 test set",
       "stems": [
         "drums",
         "bass",
@@ -299,6 +324,11 @@
       "weights": "model.ckpt",
       "license": "CC-BY-NC-4.0 (as published on Hugging Face)",
       "notes": "becruily's dual vocals + instrumental model; SDR 11.37 vocals / 17.55 instrumental on MVSEP multisong, the best all-rounder of 2026. Both outputs come from one pass",
+      "scores": {
+        "vocals": 11.37,
+        "instrumental": 17.55
+      },
+      "benchmark": "MVSEP multisong leaderboard",
       "defaults": {
         "overlap": 4
       },
@@ -335,6 +365,10 @@
       "weights": "model.ckpt",
       "license": "not stated (as published on Hugging Face)",
       "notes": "unwa's vocal model; instrumental SDR 17.25 on MVSEP multisong via subtraction. Clean on quiet passages and solo piano",
+      "scores": {
+        "vocals": 11.34
+      },
+      "benchmark": "MVSEP multisong leaderboard (entry 8683)",
       "defaults": {
         "overlap": 4
       },
@@ -366,6 +400,10 @@
       "weights": "model.ckpt",
       "license": "not stated (as published on Hugging Face)",
       "notes": "The instrumental-trained twin of bs-roformer-resurrection: fuller than subtracting the vocal model, for when the instrumental is what you keep",
+      "scores": {
+        "instrumental": 17.25
+      },
+      "benchmark": "MVSEP multisong leaderboard",
       "defaults": {
         "overlap": 4
       },
@@ -400,6 +438,14 @@
       "weights": "model.ckpt",
       "license": "not stated (distributed in the releases of the MIT-licensed MSST repository)",
       "notes": "4 stem SCNet XL tuned for the high frequencies; SDR 10.09 average on MUSDB18, drums 11.82. Supersedes scnet-large on every stem",
+      "scores": {
+        "drums": 11.82,
+        "bass": 9.24,
+        "other": 7.88,
+        "vocals": 11.42,
+        "all": 10.09
+      },
+      "benchmark": "MUSDB18 test set (MSST release notes)",
       "stems": [
         "drums",
         "bass",
@@ -431,6 +477,10 @@
       "weights": "model.ckpt",
       "license": "not stated (aufr33's model, mirrored on Hugging Face by poiqazwsx)",
       "notes": "Removes noise and bleed from a stem, usually a vocal; SDR 27.99. Chain it after separation and before dereverb",
+      "scores": {
+        "dry": 27.99
+      },
+      "benchmark": "publisher's own test set",
       "stems": [
         "dry"
       ],

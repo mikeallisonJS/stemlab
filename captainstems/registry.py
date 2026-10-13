@@ -63,6 +63,10 @@ class Manifest(BaseModel):
     source: str | list[str] | dict[str, str] | None = None
     license: str = ""
     notes: str = ""
+    #: Published SDR in dB per stem ("all" for a 4 stem average), and where it was measured.
+    #: Benchmarks differ (MUSDB18, MVSEP multisong, a publisher's own set): compare within one only
+    scores: dict[str, float] = Field(default_factory=dict)
+    benchmark: str = ""
     #: MDX-Net models carry no config: dim_f, dim_t, n_fft, compensate
     onnx_params: dict[str, Any] | None = None
     #: Allow loading checkpoints that need Python's pickle (it can run code)
@@ -351,7 +355,17 @@ class Registry:
         """Installed models followed by curated ones that are not installed yet."""
         rows = [model.summary() for model in self.list()]
         installed = {row["id"] for row in rows}
-        for model_id, entry in load_curated().items():
+        curated = load_curated()
+        for row in rows:
+            # Published scores belong to the curated list, which may know more than a
+            # manifest written when it was fetched
+            entry = curated.get(row["id"])
+            if entry:
+                row["curated"] = True
+                for key in ("scores", "benchmark"):
+                    if entry.get(key) and not row.get(key):
+                        row[key] = entry[key]
+        for model_id, entry in curated.items():
             if model_id not in installed:
                 row = {key: value for key, value in entry.items() if key != "files"}
                 row["installed"] = False

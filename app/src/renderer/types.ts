@@ -63,6 +63,9 @@ export interface ModelInfo {
   license?: string;
   notes?: string;
   defaults?: Record<string, unknown>;
+  /** Published SDR in dB per stem; the benchmarks differ between models */
+  scores?: Record<string, number>;
+  benchmark?: string;
 }
 
 export interface ModelsResponse {

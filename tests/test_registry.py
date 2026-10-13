@@ -205,6 +205,22 @@ def test_catalog_lists_installed_and_fetchable(home, curated, fake_backend):
     assert "files" not in rows["curated-model"]
 
 
+def test_catalog_adds_published_scores_to_installed_models(home, curated, fake_backend):
+    # A manifest written at fetch time may predate the scores; the catalog fills them in
+    curated["scores"] = {"vocals": 11.2}
+    curated["benchmark"] = "a test set"
+    Registry().fetch("curated-model")
+    folder = home / "models" / "curated-model"
+    manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
+    manifest.pop("scores", None)
+    manifest.pop("benchmark", None)
+    (folder / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    row = {entry["id"]: entry for entry in Registry().catalog()}["curated-model"]
+    assert (
+        row["installed"] and row["curated"] and row["scores"] == {"vocals": 11.2} and row["benchmark"] == "a test set"
+    )
+
+
 def test_shipped_curated_catalog_is_well_formed():
     entries = registry_module.load_curated()
     assert {"htdemucs", "htdemucs_6s", "mel-band-roformer-vocals-kim", "scnet-large", "dereverb-mel-roformer"} <= set(
@@ -219,6 +235,11 @@ def test_shipped_curated_catalog_is_well_formed():
         for item in entry["files"]:
             assert item["url"].startswith("https://") and len(item["sha256"]) == 64 and item["size"] > 0
         assert entry["license"], f"{model_id} must state its license"
+        if manifest.scores:
+            assert manifest.benchmark, f"{model_id}: scores need the benchmark they were measured on"
+            assert all(0 < value < 60 for value in manifest.scores.values()), model_id
+    scored = [model_id for model_id, entry in entries.items() if entry.get("scores")]
+    assert {"mel-band-roformer-deux", "scnet-xl-ihf", "htdemucs"} <= set(scored)
 
 
 # CLI ------------------------------------------------------------------------------

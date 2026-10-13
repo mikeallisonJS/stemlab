@@ -127,6 +127,9 @@ and single-purpose models for dereverb, denoise and karaoke (lead against backin
 Some weights are non-commercial (Deux is CC-BY-NC-4.0) and several community checkpoints state no licence;
 each manifest records what its publisher says.
 
+The lists (`models list`, the Models view) show each model's SDR as published by its authors. The benchmarks
+differ (MUSDB18, MVSEP's multisong set, a publisher's own recordings), so compare numbers within one only.
+
 `fetch` downloads curated models from their publishers and verifies them by SHA-256. Weights are never
 part of this repository and carry their own licenses, shown in `models list --json` and in the UI.
 

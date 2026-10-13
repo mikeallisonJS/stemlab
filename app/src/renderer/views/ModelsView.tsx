@@ -145,6 +145,12 @@ export function ModelsView({ system, models, onChanged }: Props) {
       <td><strong>{model.id}</strong><div className="muted">{model.notes}</div></td>
       <td>{model.backend}<div className="muted">{model.arch}</div></td>
       <td>{model.stems.join(", ")}</td>
+      <td className="scores" title={model.benchmark}>
+        {model.scores && Object.entries(model.scores).map(([stem, value]) => (
+          <div key={stem}><span className="muted">{stem}</span> {value.toFixed(1)}</div>
+        ))}
+        {model.scores && model.benchmark && <div className="muted small-print">{model.benchmark}</div>}
+      </td>
       <td className="muted">{model.license}</td>
       <td>
         {model.installed ? (
@@ -193,7 +199,7 @@ export function ModelsView({ system, models, onChanged }: Props) {
           <div key={id} className="banner warning">{id}: broken manifest: {problem}</div>
         ))}
         <table className="models">
-          <thead><tr><th>id</th><th>backend</th><th>stems</th><th>license</th><th /></tr></thead>
+          <thead><tr><th>id</th><th>backend</th><th>stems</th><th title="As published by each model's authors. The benchmarks differ: compare within one.">SDR dB</th><th>license</th><th /></tr></thead>
           <tbody>{models?.models.map(row)}</tbody>
         </table>
       </section>

@@ -369,7 +369,7 @@ def models_list(as_json: bool = typer.Option(False, "--json")) -> None:
         print(json.dumps(rows, indent=2))
         return
     table = Table(title=f"Models in {registry.root}", title_justify="left")
-    for column in ("id", "backend", "arch", "stems", "status"):
+    for column in ("id", "backend", "arch", "stems", "SDR dB", "status"):
         table.add_column(column)
     for row in rows:
         if row["installed"]:
@@ -378,10 +378,19 @@ def models_list(as_json: bool = typer.Option(False, "--json")) -> None:
             status = f"fetch ({_size(row.get('download_bytes', 0))})"
         else:
             status = "[yellow]incomplete[/yellow]"
-        table.add_row(row["id"], row["backend"], row.get("arch", ""), ", ".join(row["stems"]), status)
+        table.add_row(row["id"], row["backend"], row.get("arch", ""), ", ".join(row["stems"]), _scores(row), status)
     console.print(table)
+    console.print(
+        "[dim]SDR as published by each model's authors on different benchmarks (see --json): compare within one.[/dim]"
+    )
     for model_id, problem in registry.problems.items():
         console.print(f"[yellow]{model_id}: broken manifest: {problem}[/yellow]")
+
+
+def _scores(row: dict) -> str:
+    """'vocals 11.4 · instrumental 17.6'; the benchmark is in `models list --json`."""
+    scores = row.get("scores") or {}
+    return " · ".join(f"{stem} {value:.1f}" for stem, value in scores.items())
 
 
 @models_app.command("fetch")
