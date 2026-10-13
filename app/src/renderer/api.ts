@@ -12,10 +12,13 @@ import type {
 } from "./types";
 
 // Served by `captainstems serve` the API shares our origin; under Vite's dev
-// server (or with VITE_API set) it lives on its own port.
+// server (or with VITE_API set) it lives on its own port. The desktop app
+// starts the server itself and says where.
 const DEV_API = "http://127.0.0.1:8787";
 export const API: string =
-  (import.meta.env.VITE_API as string | undefined) ?? (import.meta.env.DEV ? DEV_API : window.location.origin);
+  window.captainstems?.api ??
+  (import.meta.env.VITE_API as string | undefined) ??
+  (import.meta.env.DEV ? DEV_API : window.location.origin);
 
 export class ApiError extends Error {
   status: number;

@@ -30,17 +30,20 @@ uv run captainstems doctor
 onnxruntime. They are deliberately not regular dependencies, because the right build depends on the
 machine. `uv sync` therefore removes them again: rerun `bootstrap` afterwards, or use `uv sync --inexact`.
 `doctor` shows what was detected and the exact commands `bootstrap` runs; `doctor --set-flavor cpu`
-overrides the choice.
+overrides the choice. On Windows the ROCm wheels come from AMD and are compiled per GPU target;
+`doctor` shows the detected target, and `doctor --set-rocm-target gfx1151` sets it for a GPU that is
+not recognised.
 
 | OS | GPU | PyTorch backends (MSST, Demucs) | ONNX backend |
 | --- | --- | --- | --- |
 | Windows, Linux | NVIDIA | CUDA | CUDA |
 | macOS | Apple Silicon | MPS (fp32) | CoreML |
 | Linux | AMD | ROCm | CPU |
-| Windows | AMD, Intel | CPU | DirectML |
+| Windows | AMD RX 7000, RX 9000, Ryzen AI 300, Ryzen AI Max | ROCm (AMD's wheels) | DirectML |
+| Windows | other AMD, Intel | CPU | DirectML |
 | any | none | CPU | CPU |
 
-Only Windows with an NVIDIA GPU has been tested so far.
+Tested so far: Windows with an NVIDIA GPU, and Windows with a Radeon 8060S (Ryzen AI Max, ROCm).
 
 ## Quick start
 
@@ -147,6 +150,12 @@ uv run captainstems serve          # API on http://127.0.0.1:8787
 cd app && pnpm i && pnpm dev       # UI with hot reload on http://localhost:5173
 ```
 
+or as a desktop app, which starts the server itself:
+
+```
+cd app && pnpm i && pnpm build && pnpm desktop
+```
+
 or build the UI once (`cd app && pnpm i && pnpm build`) and open http://127.0.0.1:8787/, where the
 server then serves it.
 
@@ -159,8 +168,9 @@ server then serves it.
   A/B switches between any two without losing the position (Space plays, X switches).
 - **Models**: what the machine can run, fetch curated models, add your own.
 
-The server listens on the local machine only and has no authentication. Electron packaging is phase 4 of
-the handoff and not done yet.
+The server listens on the local machine only and has no authentication. The desktop app (`app/src/main/`)
+spawns it on a free port, offers to run `bootstrap` on the first start and stops it on exit; it still needs
+the repository's `.venv` or `uv`. Installers (electron-builder) are not done yet.
 
 ## Development
 
