@@ -143,6 +143,7 @@ export interface SystemInfo {
   detected_flavor: string;
   flavor_source: string;
   rocm_target?: string | null;
+  bootstrap?: { commands?: string[]; error?: string };
   torch: { version: string | null; hip?: string | null; cuda: boolean; mps: boolean };
   onnxruntime: { version: string | null; providers: string[] };
   ffmpeg: string | null;

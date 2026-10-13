@@ -3,6 +3,8 @@
 interface CaptainStemsShell {
   api?: string;
   pathForFile: (file: File) => string;
+  /** Run `captainstems bootstrap` and restart the server; the shell shows its progress */
+  bootstrap: () => void;
 }
 
 interface Window {

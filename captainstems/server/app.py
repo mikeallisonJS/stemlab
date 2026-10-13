@@ -33,7 +33,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from captainstems import __version__, audio, dsp, paths, runner
+from captainstems import __version__, audio, bootstrap, dsp, paths, runner
 from captainstems import recipe as recipe_module
 from captainstems.backends import base, device
 from captainstems.recipe import RecipeError
@@ -78,6 +78,13 @@ class AddModelRequest(BaseModel):
     manifest: dict[str, Any]
     files: dict[str, str] = Field(default_factory=dict, description="File name in the registry -> current path")
     move: bool = False
+
+
+class SystemConfig(BaseModel):
+    """The Doctor screen's overrides. None means "as detected"."""
+
+    torch_flavor: str | None = None
+    rocm_target: str | None = None
 
 
 class OpenRunRequest(BaseModel):
@@ -189,7 +196,22 @@ def create_app(
         info["version"] = __version__
         info["cache_bytes"] = runner.Cache().size()
         info["outputs_dir"] = str(paths.outputs_dir())
+        # What `captainstems bootstrap` would run for the chosen flavor, for the Doctor screen
+        try:
+            info["bootstrap"] = {"commands": [" ".join(command) for command in bootstrap.plan(info["flavor"])]}
+        except ValueError as e:
+            info["bootstrap"] = {"error": str(e)}
         return info
+
+    @app.put("/system/config")
+    def set_system_config(body: SystemConfig) -> dict:
+        """Override the torch flavor and, on Windows ROCm, the GPU target; null restores detection."""
+        if body.torch_flavor is not None and body.torch_flavor not in device.FLAVORS:
+            raise HTTPException(400, f"Unknown flavor '{body.torch_flavor}'. Use one of {', '.join(device.FLAVORS)}.")
+        if body.rocm_target is not None and not body.rocm_target.startswith("gfx"):
+            raise HTTPException(400, f"Unknown ROCm target '{body.rocm_target}'. Use a gfx name such as gfx1151.")
+        device.write_config(torch_flavor=body.torch_flavor, rocm_target=body.rocm_target)
+        return system()
 
     @app.get("/schema")
     def schema() -> dict:

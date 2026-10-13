@@ -43,7 +43,11 @@ function applyEvent(job: Job, event: JobEvent): Job {
 }
 
 export function App() {
-  const [tab, setTab] = useState<Tab>("recipe");
+  // #models etc. opens on that tab
+  const [tab, setTab] = useState<Tab>(() => {
+    const wanted = window.location.hash.slice(1);
+    return wanted === "run" || wanted === "results" || wanted === "models" ? wanted : "recipe";
+  });
   const [schema, setSchema] = useState<Schema | null>(null);
   const [models, setModels] = useState<ModelsResponse | null>(null);
   const [system, setSystem] = useState<SystemInfo | null>(null);

@@ -60,6 +60,12 @@ const enc = encodeURIComponent;
 
 export const api = {
   system: () => request<SystemInfo>("/system"),
+  setSystemConfig: (config: { torch_flavor: string | null; rocm_target: string | null }) =>
+    request<SystemInfo>("/system/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(config),
+    }),
   schema: () => request<Schema>("/schema"),
   models: () => request<ModelsResponse>("/models"),
   fetchModel: (id: string) => post<unknown>(`/models/${enc(id)}/fetch`),

@@ -166,7 +166,9 @@ server then serves it.
   log and any warnings. Runs can be cancelled.
 - **Results**: waveform and spectrogram of every stem, the mix and the residual. One transport plays them;
   A/B switches between any two without losing the position (Space plays, X switches).
-- **Models**: what the machine can run, fetch curated models, add your own.
+- **Models**: what the machine can run, fetch curated models, add your own. The Doctor part overrides the
+  detected torch flavor (and the ROCm target on Windows), like `doctor --set-flavor`; the desktop app can then
+  reinstall the model libraries from there, a browser shows the `bootstrap` command to run.
 
 The server listens on the local machine only and has no authentication. The desktop app (`app/src/main/`)
 spawns it on a free port, offers to run `bootstrap` on the first start and stops it on exit. `cd app && pnpm dist`

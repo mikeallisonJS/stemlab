@@ -28,6 +28,8 @@ const LOG_LINES = 400;
 
 let server: ChildProcess | null = null;
 let apiUrl: string | null = null;
+let python: Python | null = null;
+let busy = false;
 let loading: BrowserWindow | null = null;
 let main: BrowserWindow | null = null;
 const log: string[] = [];
@@ -210,8 +212,8 @@ function pythonEnv(python: Python): NodeJS.ProcessEnv {
   };
 }
 
-async function startServer(python: Python): Promise<string> {
-  const port = await freePort();
+async function startServer(python: Python, port?: number): Promise<string> {
+  port = port ?? (await freePort());
   const url = `http://127.0.0.1:${port}`;
   logLine(`$ ${python.describe} serve --port ${port}`);
   server = spawn(python.command, [...python.args, "serve", "--port", String(port)], {
@@ -345,7 +347,6 @@ async function start(): Promise<void> {
   loading = showLoading();
   status("Starting…");
 
-  let python: Python | null = null;
   const attach = process.env.CAPTAINSTEMS_API;
   if (attach) {
     logLine(`Using the server at ${attach} (CAPTAINSTEMS_API)`);
@@ -414,6 +415,52 @@ async function start(): Promise<void> {
     }
   }
 }
+
+/**
+ * From the Models view, after the flavor was changed there (or to install the
+ * libraries after "Continue anyway"): run bootstrap with the loading screen
+ * showing its output, then restart the server on the same port and reload the
+ * UI. The server has to restart because it imports torch once, at startup.
+ */
+async function rebootstrap(): Promise<void> {
+  if (busy || !python || !apiUrl || !main) return;
+  busy = true;
+  const port = Number(new URL(apiUrl).port);
+  const window = main;
+  loading = showLoading();
+  window.hide();
+  try {
+    let code: number;
+    do {
+      setState({ phase: "bootstrap", message: "Installing the model libraries…", actions: [] });
+      code = await runBootstrap(python);
+      if (code !== 0) {
+        const next = await ask("The installation failed. See the log above.", ["bootstrap", "continue", "quit"]);
+        if (next !== "bootstrap") break;
+      }
+    } while (code !== 0);
+
+    status("Restarting the server…");
+    stopServer();
+    apiUrl = null;
+    while (!apiUrl) {
+      try {
+        apiUrl = await startServer(python, port);
+      } catch (error) {
+        const choice = await ask((error as Error).message, ["retry", "quit"]);
+        if (choice !== "retry") return;
+      }
+    }
+    window.webContents.reload();
+  } finally {
+    window.show();
+    loading?.close();
+    loading = null;
+    busy = false;
+  }
+}
+
+ipcMain.on("bootstrap", () => void rebootstrap());
 
 if (process.env.CAPTAINSTEMS_DATA) {
   // Testing aid: a user data folder other than the real one

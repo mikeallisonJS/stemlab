@@ -59,6 +59,25 @@ def test_system_reports_hardware_and_backends(client):
     assert set(info["backends"]) == {"msst", "demucs", "onnx"}
 
 
+def test_system_config_overrides_flavor_and_target(client, home):
+    info = client.get("/system").json()
+    assert info["flavor_source"] == "detected"
+    assert "commands" in info["bootstrap"] or "error" in info["bootstrap"]
+
+    info = client.put("/system/config", json={"torch_flavor": "cpu"}).json()
+    assert (info["flavor"], info["flavor_source"]) == ("cpu", "override")
+    assert any("whl/cpu" in command for command in info["bootstrap"]["commands"])
+
+    assert client.put("/system/config", json={"torch_flavor": "vulkan"}).status_code == 400
+    assert client.put("/system/config", json={"rocm_target": "navi"}).status_code == 400
+    assert (
+        client.put("/system/config", json={"torch_flavor": "rocm", "rocm_target": "gfx1100"}).json()["flavor"] == "rocm"
+    )
+
+    info = client.put("/system/config", json={}).json()
+    assert info["flavor_source"] == "detected"
+
+
 def test_schema_carries_what_the_forms_need(client):
     schema = client.get("/schema").json()
     assert set(schema["ops"]) == {"separate", "subtract", "ensemble", "postprocess", "analyze", "export"}

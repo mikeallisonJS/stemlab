@@ -23,6 +23,8 @@ const shell = {
     ipcRenderer.on("state", (_event, state: ShellState) => callback(state));
   },
   action: (name: ShellState["actions"][number]) => ipcRenderer.send("action", name),
+  /** From the Models view: install (or reinstall, after a flavor change) the model libraries */
+  bootstrap: () => ipcRenderer.send("bootstrap"),
 };
 
 export type Shell = typeof shell;

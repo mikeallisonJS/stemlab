@@ -12,7 +12,11 @@ when the window closes.
 
 With `pnpm dev` running, the shell loads the Vite dev server instead of the
 built UI, so renderer changes hot-reload. `preload.ts` hands the renderer the
-API URL and the real path of dropped files (`window.captainstems`).
+API URL, the real path of dropped files and a `bootstrap()` call
+(`window.captainstems`): the Doctor part of the Models view uses it after a
+flavor change to reinstall the model libraries, which the shell runs with the
+loading screen showing, then restarts the server on the same port and reloads
+the UI.
 
 ## The packaged app
 

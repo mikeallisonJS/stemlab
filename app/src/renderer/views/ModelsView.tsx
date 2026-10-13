@@ -15,6 +15,68 @@ function size(bytes: number | undefined): string {
 }
 
 const EMPTY = { id: "", backend: "msst", arch: "", config: "", weights: "", stems: "", license: "", notes: "" };
+const FLAVORS = ["cuda", "rocm", "mps", "cpu"];
+
+/** The Doctor part of the view: override what was detected, then (re)install the libraries for it. */
+function Doctor({ system, onChanged }: { system: SystemInfo; onChanged: () => void }) {
+  const [flavor, setFlavor] = useState(system.flavor_source === "override" ? system.flavor : "auto");
+  const [target, setTarget] = useState(system.rocm_target ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const shell = window.captainstems;
+  const windows = system.os === "Windows";
+  const changed = flavor !== (system.flavor_source === "override" ? system.flavor : "auto") || (target || "") !== (system.rocm_target ?? "");
+  const installed = Boolean(system.torch.version);
+  // The installed torch has to match the chosen flavor: ROCm and CUDA builds both report "cuda"
+  const matches = installed && (system.flavor === "cpu" || system.flavor === "mps" || system.torch.cuda);
+
+  const apply = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.setSystemConfig({ torch_flavor: flavor === "auto" ? null : flavor, rocm_target: target.trim() || null });
+      onChanged();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className="doctor">
+      <div className="form doctor-form">
+        <label className="field"><span className="field-name">Torch flavor</span>
+          <select value={flavor} onChange={(e) => setFlavor(e.target.value)}>
+            <option value="auto">auto (detected: {system.detected_flavor})</option>
+            {FLAVORS.map((name) => <option key={name} value={name}>{name}</option>)}
+          </select>
+        </label>
+        {windows && (flavor === "rocm" || (flavor === "auto" && system.detected_flavor === "rocm")) && (
+          <label className="field"><span className="field-name">ROCm target</span>
+            <input value={target} onChange={(e) => setTarget(e.target.value)} placeholder="detected, e.g. gfx1151" />
+            <span className="field-help">AMD's Windows wheels are built per GPU: gfx1151 Ryzen AI Max, gfx1150 Ryzen AI 300, gfx110X RX 7000, gfx120X RX 9000</span>
+          </label>
+        )}
+        <button className="small" disabled={busy || !changed} onClick={apply}>Apply</button>
+      </div>
+      {error && <div className="banner error" role="alert">{error}</div>}
+      {system.bootstrap?.error && <div className="banner warning">{system.bootstrap.error}</div>}
+      {!matches && !system.bootstrap?.error && (
+        <div className="banner warning">
+          {installed ? `The installed torch (${system.torch.version}) is not a ${system.flavor} build.` : "The model libraries are not installed."}
+          {shell ? (
+            <div><button className="small primary" onClick={() => shell.bootstrap()}>Install the model libraries</button></div>
+          ) : (
+            <div>Run <code>captainstems bootstrap</code>, which does:<pre>{system.bootstrap?.commands?.join("\n")}</pre></div>
+          )}
+        </div>
+      )}
+      {matches && shell && (
+        <p className="muted">Changed the flavor? <button className="small" onClick={() => shell.bootstrap()}>Reinstall the model libraries</button></p>
+      )}
+    </div>
+  );
+}
 
 /** The registry and what the machine can run: fetch curated models, add your own. */
 export function ModelsView({ system, models, onChanged }: Props) {
@@ -95,6 +157,7 @@ export function ModelsView({ system, models, onChanged }: Props) {
             </tbody>
           </table>
         ) : <p className="muted">Loading...</p>}
+        {system && <Doctor key={`${system.flavor}:${system.flavor_source}:${system.rocm_target ?? ""}`} system={system} onChanged={onChanged} />}
       </section>
 
       <section>
