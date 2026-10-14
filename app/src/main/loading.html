@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>CaptainStems</title>
+    <style>
+      :root { color-scheme: dark; }
+      html, body { margin: 0; height: 100%; background: #16181d; color: #e6e6e6; font: 14px/1.4 system-ui, sans-serif; }
+      body { display: flex; flex-direction: column; padding: 20px 24px; box-sizing: border-box; gap: 12px; }
+      h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: 0.2px; }
+      #message { color: #c3c7d1; min-height: 1.4em; white-space: pre-wrap; }
+      #message.error { color: #ff8a80; }
+      #bar { height: 3px; background: #2a2e37; border-radius: 2px; overflow: hidden; }
+      #bar div { height: 100%; width: 35%; background: #7c9cff; border-radius: 2px; animation: slide 1.4s ease-in-out infinite; }
+      #bar.idle div { animation: none; width: 0; }
+      @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+      #log { flex: 1; margin: 0; padding: 10px 12px; overflow: auto; background: #0f1115; border: 1px solid #262a33; border-radius: 6px;
+             font: 12px/1.45 ui-monospace, Consolas, monospace; color: #aab0bd; white-space: pre-wrap; word-break: break-word; }
+      #actions { display: flex; gap: 8px; justify-content: flex-end; }
+      button { background: #262a33; color: #e6e6e6; border: 1px solid #353a45; border-radius: 6px; padding: 7px 14px; font: inherit; cursor: pointer; }
+      button.primary { background: #3b5bdb; border-color: #3b5bdb; color: white; }
+      button:hover { filter: brightness(1.15); }
+      button[hidden] { display: none; }
+    </style>
+  </head>
+  <body>
+    <h1>CaptainStems</h1>
+    <div id="message">Starting the server…</div>
+    <div id="bar"><div></div></div>
+    <pre id="log"></pre>
+    <div id="actions">
+      <button id="bootstrap" class="primary" hidden>Install model libraries</button>
+      <button id="retry" class="primary" hidden>Retry</button>
+      <button id="continue" hidden>Continue anyway</button>
+      <button id="quit" hidden>Quit</button>
+    </div>
+    <script>
+      const shell = window.captainstems;
+      const log = document.getElementById("log");
+      const message = document.getElementById("message");
+      const bar = document.getElementById("bar");
+      const buttons = ["bootstrap", "retry", "continue", "quit"].map((id) => document.getElementById(id));
+      for (const button of buttons) button.addEventListener("click", () => shell.action(button.id));
+      shell.onLog((line) => {
+        const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 4;
+        log.textContent += line.endsWith("\n") ? line : line + "\n";
+        if (atBottom) log.scrollTop = log.scrollHeight;
+      });
+      shell.onState((state) => {
+        message.textContent = state.message;
+        message.classList.toggle("error", state.phase === "error");
+        bar.classList.toggle("idle", state.phase === "error");
+        for (const button of buttons) button.hidden = !state.actions.includes(button.id);
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,60 @@
+[project]
+name = "captainstems"
+version = "2.0.0.dev0"
+description = "Power-user stem separation workbench: recipe engine, CLI, local API and UI"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Mike Allison" }]
+# torch, the model libraries and onnxruntime are NOT listed here: which build
+# is right depends on the GPU, so `captainstems bootstrap` installs them.
+dependencies = [
+    "numpy",
+    "soundfile",
+    "soxr",
+    "pydantic>=2.6",
+    "pyyaml",
+    "typer",
+    "rich",
+]
+
+[project.optional-dependencies]
+server = [
+    "fastapi",
+    "uvicorn[standard]",
+    "websockets",
+]
+dev = [
+    "pytest",
+    "ruff",
+    "httpx",
+]
+
+[project.scripts]
+captainstems = "captainstems.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["captainstems"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "models: needs model weights (downloaded on first use) and the bootstrapped backends",
+    "gpu: needs a GPU; skipped when none is detected",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["archive", "third_party", "app"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008"]  # typer and FastAPI declare options as argument defaults
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]

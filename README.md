@@ -1,280 +1,205 @@
 # CaptainStems
 
-A cross-platform Python GUI application for audio source separation using AI models.
+A power-user stem separation workbench. Run any separation model you choose, including checkpoints you
+add yourself, with every inference knob exposed. Compose separations as a graph (a *recipe*) of
+separate, subtract, ensemble, post-process, analyze and export steps, and rerun the same recipe on any file.
 
-## Features
+This is version 2, a rewrite around a recipe engine. The original PyQt application is kept in
+[`archive/v1/`](archive/v1/). Plan and decisions:
+[CaptainStems v2 handoff](https://claude.ai/artifact/FoargYKnKDffjnQYnFNWzF).
 
-- Drag and drop interface for audio files and folders, with a queue for batch processing
-- Support for multiple AI models (Demucs v3/v4, Spleeter, Band-Split RoFormer, and D3Net)
-- Each model family installs into its own isolated environment, straight from the application
-- Interactive results window with waveform display and audio playback, including the original mix for comparison
-- Save separated audio stems as WAV, FLAC, AIFF, MP3, M4A or OGG, optionally automatically after processing
-- Support for a wide range of audio formats (MP3, WAV, FLAC, OGG, M4A, AAC, AIFF, WMA, etc.) and the audio track of video files
-- GPU acceleration: NVIDIA (CUDA), any DirectX 12 GPU for D3Net on Windows, and Metal on Apple Silicon
-- Light and dark theme, and settings that are remembered between sessions
-- Command line mode for separating files without the user interface
+| Part | Where | What |
+| --- | --- | --- |
+| Engine and CLI | `captainstems/` | Recipes, runner, cache, model registry, backends |
+| API server | `captainstems/server/` | FastAPI and WebSocket, local only |
+| UI | `app/` | React: recipe graph, run queue, results |
 
-## Installation
+## Setup
 
-CaptainStems needs **Python 3.10** for full model support (see [Python versions](#python-versions)).
-
-### Windows
-
-Double-click `start.bat`, or run it from a terminal:
+Requires [uv](https://docs.astral.sh/uv/), git, and for the UI [pnpm](https://pnpm.io/).
 
 ```
-start.bat
+git clone --recurse-submodules https://github.com/mikeallisonJS/CaptainStems
+cd CaptainStems
+uv sync --extra dev --extra server
+uv run captainstems bootstrap
+uv run captainstems doctor
 ```
 
-It creates a virtual environment on first use, installs the dependencies and starts the application.
+`bootstrap` installs the build of PyTorch that matches your GPU, the model libraries and one build of
+onnxruntime. They are deliberately not regular dependencies, because the right build depends on the
+machine. `uv sync` therefore removes them again: rerun `bootstrap` afterwards, or use `uv sync --inexact`.
+`doctor` shows what was detected and the exact commands `bootstrap` runs; `doctor --set-flavor cpu`
+overrides the choice. On Windows the ROCm wheels come from AMD and are compiled per GPU target;
+`doctor` shows the detected target, and `doctor --set-rocm-target gfx1151` sets it for a GPU that is
+not recognised.
 
-### macOS and Linux
+| OS | GPU | PyTorch backends (MSST, Demucs) | ONNX backend |
+| --- | --- | --- | --- |
+| Windows, Linux | NVIDIA | CUDA | CUDA |
+| macOS | Apple Silicon | MPS (fp32) | CoreML |
+| Linux | AMD | ROCm | CPU |
+| Windows | AMD RX 7000, RX 9000, Ryzen AI 300, Ryzen AI Max | ROCm (AMD's wheels) | DirectML |
+| Windows | other AMD, Intel | CPU | DirectML |
+| any | none | CPU | CPU |
 
-```bash
-./start.sh
-```
+Tested so far: Windows with an NVIDIA GPU, and Windows with a Radeon 8060S (Ryzen AI Max, ROCm).
 
-This does the same using `python3.10` if available, otherwise `python3`. If your default Python is newer
-than 3.10, create a dedicated Python 3.10 environment instead:
-
-```bash
-./setup_compatible_env.sh
-./start_compatible.sh
-```
-
-### Manual installation
-
-```
-pip install -r requirements.txt
-python run.py
-```
-
-`requirements.txt` only contains the application itself (PyQt6, NumPy, soundfile and a bundled FFmpeg).
-The AI models are installed separately, as described next.
-
-## Installing models
-
-Nothing needs to be installed up front. Select a model in the application and click **Install Model**,
-or open **Manage Models...** to install and uninstall model families and see how much disk space they use.
-
-Models can also be installed from the command line:
+## Quick start
 
 ```
-python captain.py --install-model demucs      # Demucs v3 and v4
-python captain.py --install-model spleeter
-python captain.py --install-model bandsplit   # Band-Split RoFormer
-python captain.py --install-model d3net
-python captain.py --install-model all
-
-python captain.py --uninstall-model spleeter  # remove one again
-python captain.py --check                     # show what is installed
+uv run captainstems models fetch htdemucs
+uv run captainstems run recipes/four-stems.yaml song.flac
 ```
 
-The scripts `install_demucs.py`, `install_spleeter.py`, `install_bandsplit.py` and `install_d3net.py` do the same.
+The stems and a `run.json` land in `song [four-stems]/` next to the input. Use `--out` to choose the
+folder, and give several files to process them one after another.
 
-### How models are installed
+## Recipes
 
-The separation libraries require mutually incompatible versions of NumPy, PyTorch and TensorFlow, so they
-cannot share one Python environment. CaptainStems therefore gives every model family its own virtual
-environment and runs the models as separate processes:
+A recipe is a YAML file: named nodes, each with an `op`. Nodes read the outputs of other nodes as
+`node.stem`; `mix` is the input file.
 
-| Platform | Location of environments and model weights            |
-| -------- | ----------------------------------------------------- |
-| Windows  | `%LOCALAPPDATA%\CaptainStems`                         |
-| macOS    | `~/Library/Application Support/CaptainStems`          |
-| Linux    | `~/.local/share/CaptainStems`                         |
-
-Set the `CAPTAINSTEMS_HOME` environment variable to use a different location.
-
-Installing or removing a model never changes the environment the application runs in, and uninstalling a
-model simply deletes its folder. If a model stops working, uninstall and reinstall it.
-
-| Model family        | Download size                    | Runs on                                    |
-| ------------------- | -------------------------------- | ------------------------------------------ |
-| Demucs (v3 and v4)  | ~5 GB with NVIDIA GPU, ~1.5 GB without | NVIDIA GPU (CUDA), Apple GPU, or CPU |
-| Spleeter            | ~1.5 GB                          | CPU (fast)                                 |
-| Band-Split RoFormer | ~6 GB with NVIDIA GPU, ~2 GB without, plus ~650 MB per model | NVIDIA GPU (CUDA), Apple GPU, or CPU (slow) |
-| D3Net               | ~700 MB                          | Any DirectX 12 GPU on Windows, otherwise CPU (slow) |
-
-## Usage
-
-1. Drag audio files or folders into the window (or click the drop area to browse)
-2. Select a model. **Advanced Models...** offers every variant with a description
-3. Click **Process Audio**. Progress is shown per file, and processing can be cancelled
-4. When a single file is done its results window opens. In a batch, double-click a finished file to open its results
-
-### Visualizing and Playing Stems
-
-After processing an audio file:
-
-1. A results window shows the original mix and the separated stems
-2. Each track displays a waveform visualization
-3. Use the play/pause buttons to listen to a track
-4. Click a waveform to jump to that position. Switching to another track continues from the same position,
-   which makes it easy to compare stems with each other and with the original
-5. Choose a format and click "Save..." on any stem to save it to your preferred location
-6. Use the "Save All Files..." button to save all stems into a folder named after the track and model
-
-### Settings
-
-**Settings...** lets you change:
-
-- the theme (follow the system, dark or light)
-- the default format and bitrate for saving stems
-- automatic saving of all stems after processing, next to the source file or into an output folder
-- the device to process on (automatic, CPU only, NVIDIA GPU, Apple GPU)
-- Demucs quality options (number of shifts, overlap) and Wiener filtering for Spleeter
-
-### Command line
-
-Files can be separated without the user interface:
-
-```
-python captain.py --separate song.mp3
-python captain.py --separate *.flac --model htdemucs_ft --format mp3 --bitrate 320k --output stems/
-python captain.py --separate song.wav --model bandsplit:vocals
-python captain.py --separate song.wav --two-stems
-python captain.py --list-models
+```yaml
+version: 1
+name: vocals-instrumental
+nodes:
+  vox:
+    op: separate
+    model: mel-band-roformer-vocals-kim
+    targets: [vocals]
+    params: {overlap: 4, shifts: 2}
+  inst:
+    op: subtract                     # sample-exact: vocals + instrumental = mix
+    inputs: {a: mix, b: vox.vocals}
+  check:
+    op: analyze                      # how much did the chain lose?
+    inputs: {stems: [vox.vocals, inst.out]}
+  out:
+    op: export
+    inputs: {vocals: vox.vocals, instrumental: inst.out}
+    params: {format: flac, bit_depth: 24}
 ```
 
-## GPU Acceleration
+| Op | Does | Outputs | Parameters |
+| --- | --- | --- | --- |
+| `separate` | Runs one model on one input | the stems in `targets` (all of the model's by default) | the knobs of the model's backend |
+| `subtract` | `a - b`, sample-exact | `out` | `gain_b` |
+| `ensemble` | Combines several versions of a stem | `out` | `method` (avg, median, max_spec, min_spec), `weights` |
+| `postprocess` | Runs a single-purpose model (dereverb, denoise) | `out` | the knobs of the model's backend |
+| `analyze` | `residual = mix - sum(stems)`, levels, optional SI-SDR against a reference file | `residual` | `reference` |
+| `export` | Writes files | none | `format` (flac, wav, mp3), `bit_depth`, `sample_rate`, `naming`, `bitrate` |
 
-#### NVIDIA GPUs
+`defaults:` at the top of a recipe applies to every separate and postprocess node. A knob of the same name
+can mean different things per backend (`overlap` is a count of chunks for MSST and a fraction for Demucs
+and ONNX); a default is applied to the nodes it fits.
 
-When an NVIDIA GPU is detected, Demucs and Band-Split RoFormer are installed with the CUDA build of PyTorch.
-Only a current NVIDIA driver is required; the CUDA libraries are part of the installation.
+`captainstems validate recipe.yaml` checks a recipe against the installed models and prints every node's
+fully resolved parameters. `captainstems schema --backends` prints the JSON Schema of the format and of
+each backend's knobs. Examples are in [`recipes/`](recipes/), including the worked example from the handoff.
 
-#### Windows (any GPU)
+### Reproducibility
 
-D3Net runs through DirectML and uses any DirectX 12 capable GPU, including AMD and Intel ones.
+Every run writes `run.json` beside its outputs: the recipe, the resolved parameters of each node, the
+SHA-256 of the input and of every model file, and the backend versions. `captainstems run run.json song.flac`
+repeats a run with exactly those parameters.
 
-#### Apple Silicon Macs (M1/M2/M3)
+Intermediate stems are cached under `~/.captainstems/cache`, keyed by a node's parameters, its model's
+hash and its inputs, so rerunning a recipe only recomputes what changed (`captainstems cache info|clear`).
+A run that is cancelled or fails writes no output files.
 
-CaptainStems detects Apple Silicon Macs and installs `tensorflow-macos` and `tensorflow-metal` for Spleeter,
-which avoids the AVX instruction errors of the standard TensorFlow package. PyTorch based models can use the
-Apple GPU: select "Apple GPU (MPS)" as the device in the settings.
+## Models
 
-#### CPU
-
-Everything also runs without a GPU. Spleeter is fast on a CPU, Demucs takes a few minutes per song, and
-Band-Split RoFormer and D3Net are slow.
-
-## External Dependencies
-
-FFmpeg is used to read and write audio files. A copy is installed with the application, so nothing needs
-to be set up. If FFmpeg is installed system-wide it is preferred:
-
-- **macOS**: `brew install ffmpeg`
-- **Ubuntu/Debian**: `sudo apt install ffmpeg`
-- **Windows**: `winget install Gyan.FFmpeg`
-
-## Supported Audio Formats
-
-CaptainStems reads every audio format FFmpeg supports:
-
-- Common formats: MP3, WAV, FLAC, OGG, M4A, AAC
-- Additional formats: WMA, AIFF, APE, OPUS, AC3, and many more
-- Video files (MP4, MOV, MKV, WEBM, AVI): the audio track is used
-
-Every file is converted to 44.1 kHz stereo before processing. Stems can be saved as WAV, FLAC, AIFF, MP3,
-M4A (AAC) or OGG (Vorbis).
-
-## Supported Models
-
-### Demucs v4 Models (Default)
-
-- **htdemucs**: Hybrid Transformer Demucs (default)
-- **htdemucs_ft**: Hybrid Transformer Demucs fine-tuned (best quality, takes four times as long)
-- **htdemucs_6s**: Hybrid Transformer Demucs for 6 sources separation (drums, bass, other, vocals, piano, guitar)
-
-### Demucs v3 Models (Legacy)
-
-- **hdemucs_mmi**: Hybrid Demucs trained on MusDB plus 800 additional songs
-- **mdx**: Hybrid Demucs trained on MusDB only, winner of track A of the MDX challenge
-- **mdx_extra**: Hybrid Demucs trained with extra data, the best v3 model
-
-All Demucs models offer the "vocals/instrumental only" option.
-
-### Spleeter Models
-
-- **2stems**: Separates audio into vocals and accompaniment
-- **4stems**: Separates audio into vocals, drums, bass, and other
-- **5stems**: Separates audio into vocals, drums, bass, piano, and other
-
-### Band-Split RoFormer Models
-
-- **vocals**: Vocals and instrumental, the highest quality vocal separation offered here
-- **6stems**: Vocals, drums, bass, guitar, piano, and other
-
-Band-Split RoFormer is the successor of Band-Split RNN. It is used here because, unlike Band-Split RNN,
-pretrained models for it are publicly available (through
-[python-audio-separator](https://github.com/nomadkaraoke/python-audio-separator)).
-
-### D3Net Models
-
-- **standard**: 4-source separation model (vocals, drums, bass, other)
-- **fast**: The same model without channel-swap averaging: half the processing time, slightly lower quality
-
-D3Net uses [Sony's official implementation](https://github.com/sony/ai-research-code/tree/master/d3net) and
-pretrained networks, converted to ONNX during installation.
-
-## Python versions
-
-| Python version | Compatibility      | Notes                                                        |
-| -------------- | ------------------ | ------------------------------------------------------------ |
-| 3.10.x         | ✅ **Recommended** | Every model can be installed                                 |
-| 3.9.x          | ⚠️ Limited         | Spleeter and D3Net only                                      |
-| 3.11.x         | ⚠️ Limited         | Everything except D3Net                                      |
-| 3.12.x         | ⚠️ Limited         | Demucs and Band-Split RoFormer only                          |
-| 3.13.x         | ⚠️ Limited         | The application runs; models need a second Python (see below) |
-
-When the application runs on a Python version a model does not support, it looks for a suitable Python
-installation (the `py` launcher on Windows, `python3.10` on the PATH) or uses [uv](https://docs.astral.sh/uv/)
-to create the model's environment. If none is found, the installation explains what is missing.
-
-## Troubleshooting
-
-### A model fails to install
-
-The installation window shows the complete installer output. Common causes:
-
-- No internet connection, or not enough disk space (see the download sizes above)
-- A Python version the model does not support: install Python 3.10
-- On Windows, very long installation paths: set `CAPTAINSTEMS_HOME` to a short path such as `C:\CaptainStems`
-
-### A model fails during processing
-
-Open **Manage Models...**, uninstall the model family and install it again. This recreates its environment
-from scratch without affecting anything else.
-
-### Out of memory on the GPU
-
-Select "CPU only" as the device in the settings, or use a smaller model (for example `htdemucs` instead of
-`htdemucs_ft`).
-
-### TensorFlow AVX Instruction Errors
-
-On Apple Silicon Macs the standard TensorFlow package fails with:
+Models live in `~/.captainstems/models/`, one folder per model with a `manifest.json`, its config and its
+weights. Set `CAPTAINSTEMS_HOME` to move everything CaptainStems stores.
 
 ```
-The TensorFlow library was compiled to use AVX instructions, but these aren't available on your machine.
+uv run captainstems models list
+uv run captainstems models fetch mel-band-roformer-deux scnet-xl-ihf
+uv run captainstems models verify
 ```
 
-CaptainStems installs `tensorflow-macos` for Spleeter on these machines. If you see this error, make sure
-the application runs on a Python built for ARM64 (not under Rosetta), then reinstall Spleeter.
+The curated list (`captainstems models list`) holds, as of October 2026: becruily's Mel-Band RoFormer Deux
+(vocals and instrumental in one pass, the best all-rounder), unwa's BS-RoFormer Resurrection (vocal and
+instrumental variants), Kim's and viperx's older vocal models, SCNet XL IHF and HT Demucs for 4 and 6 stems,
+and single-purpose models for dereverb, denoise and karaoke (lead against backing vocals). The
+`vocals-ensemble` recipe averages three vocal models, which is how the leaderboard results are made.
+Some weights are non-commercial (Deux is CC-BY-NC-4.0) and several community checkpoints state no licence;
+each manifest records what its publisher says.
+
+The lists (`models list`, the Models view) show each model's SDR as published by its authors. The benchmarks
+differ (MUSDB18, MVSEP's multisong set, a publisher's own recordings), so compare numbers within one only.
+
+`fetch` downloads curated models from their publishers and verifies them by SHA-256. Weights are never
+part of this repository and carry their own licenses, shown in `models list --json` and in the UI.
+
+| Backend | Runs | Knobs |
+| --- | --- | --- |
+| `msst` | Anything [Music-Source-Separation-Training](https://github.com/ZFTurbo/Music-Source-Separation-Training) builds from a config and a checkpoint: bs_roformer, mel_band_roformer, mdx23c, scnet, htdemucs and more | chunk_size, overlap, batch_size, shifts, tta, dtype, normalize, device |
+| `demucs` | Native Demucs `.th` bags | shifts, overlap, segment, split, seed, device |
+| `onnx` | UVR's MDX-Net models | overlap, batch_size, denoise, compensate, device |
+
+### Adding your own model
+
+```
+uv run captainstems models add my-vocals --backend msst --arch mel_band_roformer \
+    --config path/to/config.yaml --weights path/to/model.ckpt --stems vocals -d overlap=4
+```
+
+This copies the files into the registry and writes the manifest. For MSST, `--arch` is its `--model_type`
+and `--stems` are the model's outputs (its `target_instrument`, or all `instruments` if it has none). For
+Demucs give the bag's `.yaml` as `--config` and its `.th` files as `--weights`. ONNX models carry no config,
+so they need `--onnx-param dim_f=3072 --onnx-param dim_t=256 --onnx-param n_fft=6144`.
+
+Checkpoints are loaded without Python's pickle by default. If a checkpoint needs it and you trust its
+source, add `--unsafe-pickle`.
+
+## UI
+
+```
+uv run captainstems serve          # API on http://127.0.0.1:8787
+cd app && pnpm i && pnpm dev       # UI with hot reload on http://localhost:5173
+```
+
+or as a desktop app, which starts the server itself:
+
+```
+cd app && pnpm i && pnpm build && pnpm desktop
+```
+
+or build the UI once (`cd app && pnpm i && pnpm build`) and open http://127.0.0.1:8787/, where the
+server then serves it.
+
+- **Recipe**: the recipe as a graph. Add nodes from the toolbar, connect them by dragging from a stem to
+  an input, and edit the selected node in the panel. The panel is generated from the JSON Schema, so it
+  always shows exactly the knobs the chosen model's backend honors. Load, save and edit recipes as YAML.
+- **Run**: pick input files (browse, paste a path, or drop them), then watch every node's progress, the
+  log and any warnings. Runs can be cancelled.
+- **Results**: waveform and spectrogram of every stem, the mix and the residual. One transport plays them;
+  A/B switches between any two without losing the position (Space plays, X switches).
+- **Models**: what the machine can run, fetch curated models, add your own. The Doctor part overrides the
+  detected torch flavor (and the ROCm target on Windows), like `doctor --set-flavor`; the desktop app can then
+  reinstall the model libraries from there, a browser shows the `bootstrap` command to run.
+
+The server listens on the local machine only and has no authentication. The desktop app (`app/src/main/`)
+spawns it on a free port, offers to run `bootstrap` on the first start and stops it on exit. `cd app && pnpm dist`
+builds the installer (NSIS, AppImage or dmg): the installed app creates its own Python environment with uv on
+the first start, so the installer stays small and one build serves every GPU. Pushing a `v*` tag builds all
+three on GitHub Actions, signs the Windows build when the signing secrets are set, and publishes the
+auto-update feed the installed apps poll (`app/src/main/README.md`).
 
 ## Development
 
-Run the tests with:
-
 ```
-pip install -r requirements-dev.txt
-python -m pytest
+uv run pytest                    # all tests; those needing models fetch them on first use
+uv run pytest -m "not models"    # without torch or model weights
+uv run ruff check . && uv run ruff format .
+cd app && pnpm test && pnpm typecheck
 ```
 
-The tests that run the real models are skipped by default, see [test/README.md](test/README.md).
-More about the architecture is in [PROJECT.md](PROJECT.md).
+`CLAUDE.md` has the rules of the codebase. MSST is a pinned submodule at `third_party/msst`; it is wrapped,
+never modified.
 
 ## License
 
-MIT
+MIT, see [LICENSE](LICENSE). Model weights are downloaded separately and carry their own licenses.

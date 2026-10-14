@@ -1,0 +1,20 @@
+# Vocals with a UVR MDX-Net model (ONNX). Light enough for CPUs, and runs on
+# AMD and Intel GPUs through DirectML.
+#
+# Models: captainstems models fetch uvr-mdx-kim-vocal-2
+version: 1
+name: mdx-vocals
+
+nodes:
+  vox:
+    op: separate
+    model: uvr-mdx-kim-vocal-2
+    params: {overlap: 0.5, denoise: true}
+
+  inst:
+    op: subtract
+    inputs: {a: mix, b: vox.vocals}
+
+  out:
+    op: export
+    inputs: {vocals: vox.vocals, instrumental: inst.out}

@@ -1,0 +1,217 @@
+name: Release
+
+# Builds the desktop app for each platform when a version tag is pushed and
+# attaches the installers to a draft GitHub release.
+#
+# Windows signing is optional and secret-gated, the same shape and the same
+# six secrets as Cadent's build-installer workflow, so one Azure Artifact
+# Signing account serves both apps. With no secrets the build is unsigned:
+# it runs, but SmartScreen warns on first launch. A partial set fails the
+# build rather than ship an unsigned installer to somebody who asked for a
+# signed one.
+#
+#   AZURE_SIGN_TENANT_ID      the Entra tenant holding the signing identity
+#   AZURE_SIGN_CLIENT_ID      app registration with the Code Signing Certificate Profile Signer role
+#   AZURE_SIGN_CLIENT_SECRET  its client secret
+#   AZURE_SIGN_ENDPOINT       regional URI, e.g. https://eus.codesigning.azure.net/
+#   AZURE_SIGN_ACCOUNT        Artifact Signing account name
+#   AZURE_SIGN_PROFILE        certificate profile name within that account
+#
+# electron-builder does the signing itself (app/electron-builder.cjs): it
+# installs the TrustedSigning PowerShell module on the runner and signs every
+# .exe in the app plus the installer, timestamped, so the signatures outlive
+# the short-lived certificate. macOS builds are unsigned for now.
+#
+# Tag builds also publish the auto-update feed - the installers, their
+# blockmaps and latest*.yml - to Cloudflare R2, gated the same way on the five
+# secrets Cadent's workflow uses for the same bucket. The installed app checks
+# https://<R2_PUBLIC_HOST>/captainstems/ (app/electron-builder.cjs), which
+# must be a custom domain on the bucket: Cloudflare rate-limits r2.dev.
+#
+#   R2_ACCOUNT_ID         Cloudflare account id (the r2.cloudflarestorage host)
+#   R2_ACCESS_KEY_ID      R2 API token, Object Read & Write on the bucket
+#   R2_SECRET_ACCESS_KEY  its secret
+#   R2_BUCKET             bucket name, shared across apps; this writes under captainstems/
+#   R2_PUBLIC_HOST        custom domain on the bucket, e.g. downloads.example.com
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+          - os: ubuntu-latest
+            name: Linux
+          - os: macos-latest
+            name: macOS
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: astral-sh/setup-uv@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install FFmpeg (bundled into the app)
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then choco install ffmpeg -y --no-progress;
+          elif [ "$RUNNER_OS" = "macOS" ]; then brew install ffmpeg;
+          else sudo apt-get update && sudo apt-get install -y ffmpeg; fi
+
+      - name: Resolve Windows signing credentials
+        id: signing
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          TENANT_ID: ${{ secrets.AZURE_SIGN_TENANT_ID }}
+          CLIENT_ID: ${{ secrets.AZURE_SIGN_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.AZURE_SIGN_CLIENT_SECRET }}
+          ENDPOINT: ${{ secrets.AZURE_SIGN_ENDPOINT }}
+          ACCOUNT: ${{ secrets.AZURE_SIGN_ACCOUNT }}
+          PROFILE: ${{ secrets.AZURE_SIGN_PROFILE }}
+        run: |
+          # Secrets aren't readable from `if:` expressions, so the decision is
+          # made here once; electron-builder.cjs applies the same rule again.
+          $values = @($env:TENANT_ID, $env:CLIENT_ID, $env:CLIENT_SECRET,
+                      $env:ENDPOINT, $env:ACCOUNT, $env:PROFILE)
+          $present = @($values | Where-Object { $_ }).Count
+          if ($present -eq 0) {
+            Write-Host "No Artifact Signing secrets - building unsigned."
+            "signed=false" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+          if ($present -ne $values.Count) {
+            $absent = $values.Count - $present
+            Write-Host "::error::Artifact Signing needs all six AZURE_SIGN_* secrets - $absent of them are unset."
+            exit 1
+          }
+          "signed=true" >> $env:GITHUB_OUTPUT
+
+      - name: Build
+        working-directory: app
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm dist
+        env:
+          # Read by the TrustedSigning module (Azure identity), never passed on a command line
+          AZURE_TENANT_ID: ${{ secrets.AZURE_SIGN_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_SIGN_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_SIGN_CLIENT_SECRET }}
+          # Read by app/electron-builder.cjs
+          CAPTAINSTEMS_SIGN_ENDPOINT: ${{ secrets.AZURE_SIGN_ENDPOINT }}
+          CAPTAINSTEMS_SIGN_ACCOUNT: ${{ secrets.AZURE_SIGN_ACCOUNT }}
+          CAPTAINSTEMS_SIGN_PROFILE: ${{ secrets.AZURE_SIGN_PROFILE }}
+
+      - name: Verify the installer's signature
+        if: runner.os == 'Windows' && steps.signing.outputs.signed == 'true'
+        shell: pwsh
+        run: |
+          # The artefact people download, checked once more after the build
+          $installer = (Get-Item app/release/*.exe).FullName
+          $signature = Get-AuthenticodeSignature $installer
+          if ($signature.Status -ne 'Valid') {
+            Write-Host "::error::installer signature is $($signature.Status), not Valid"
+            exit 1
+          }
+          Write-Host "Signed by: $($signature.SignerCertificate.Subject)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CaptainStems-${{ matrix.name }}
+          path: |
+            app/release/*.exe
+            app/release/*.AppImage
+            app/release/*.dmg
+            app/release/*.zip
+            app/release/*.blockmap
+            app/release/latest*.yml
+          if-no-files-found: error
+
+      - name: Publish the auto-update feed to R2
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        working-directory: app/release
+        env:
+          # R2 speaks S3, so the AWS CLI on the runner drives it
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          # AWS CLI v2.23+ sends a CRC32 checksum header R2 does not implement
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PUBLIC_HOST: ${{ secrets.R2_PUBLIC_HOST }}
+        run: |
+          # Same three-state gate as signing: none skips, partial fails, all five publish.
+          present=0
+          for value in "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" "$R2_ACCOUNT_ID" "$R2_BUCKET" "$R2_PUBLIC_HOST"; do
+            [ -n "$value" ] && present=$((present + 1))
+          done
+          if [ "$present" -eq 0 ]; then
+            echo "No R2 secrets - the release has the installers, but installed apps will find no update feed."
+            exit 0
+          fi
+          if [ "$present" -ne 5 ]; then
+            echo "::error::Publishing the update feed needs all five R2_* secrets - $((5 - present)) of them are unset."
+            exit 1
+          fi
+          endpoint="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          # Installers and blockmaps carry the version in their name and never change:
+          # a rerun of a published tag fails here instead of swapping bytes under a URL
+          # an installed app may already be downloading.
+          for file in *.exe *.AppImage *.dmg *.zip *.blockmap; do
+            [ -e "$file" ] || continue
+            aws s3api put-object --bucket "$R2_BUCKET" --key "captainstems/$file" --body "$file"               --if-none-match '*' --content-type application/octet-stream --endpoint-url "$endpoint"
+          done
+          # latest*.yml is the pointer the apps poll, and the one file that is overwritten
+          for file in latest*.yml; do
+            [ -e "$file" ] || continue
+            aws s3api put-object --bucket "$R2_BUCKET" --key "captainstems/$file" --body "$file"               --content-type text/yaml --cache-control "max-age=300" --endpoint-url "$endpoint"
+          done
+          for file in latest*.yml; do
+            [ -e "$file" ] || continue
+            url="https://$R2_PUBLIC_HOST/captainstems/$file"
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-redirs 0 "$url")
+            if [ "$code" != "200" ]; then
+              echo "::error::$url answered $code, not 200 - is the custom domain attached to the bucket?"
+              exit 1
+            fi
+            echo "Update feed: $url"
+          done
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          draft: true
+          generate_release_notes: true

@@ -1,0 +1,18 @@
+# Drums, bass, other and vocals with HT Demucs.
+#
+# Models: captainstems models fetch htdemucs
+version: 1
+name: four-stems
+
+nodes:
+  split:
+    op: separate
+    model: htdemucs
+
+  check:
+    op: analyze
+    inputs: {stems: [split.vocals, split.drums, split.bass, split.other]}
+
+  out:
+    op: export
+    inputs: [split.vocals, split.drums, split.bass, split.other]

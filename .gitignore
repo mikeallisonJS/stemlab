@@ -8,10 +8,13 @@ __pycache__/
 
 # Distribution / packaging
 dist/
+dist-electron/
 build/
+release/
 *.egg-info/
 
 # Virtual environments
+.venv/
 venv/
 env/
 ENV/
@@ -27,14 +30,30 @@ venv_*/
 .DS_Store
 Thumbs.db
 
-# Application specific
+# Tools
+.pytest_cache/
+.ruff_cache/
+
+# Audio is never committed, apart from the test fixtures
 *.mp3
 *.wav
 *.flac
 *.ogg
 *.m4a
 *.aac
+!tests/fixtures/*.flac
 
-# Tests
-.pytest_cache/
-test/samples/
+# Real tracks for local testing
+tests/local/
+
+# Model weights never enter git
+*.ckpt
+*.th
+*.onnx
+*.pth
+
+# UI
+app/node_modules/
+app/dist/
+app/out/
+app/release/

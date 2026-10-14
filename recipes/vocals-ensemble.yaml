@@ -1,0 +1,45 @@
+# Vocals the way the leaderboards get them: three different vocal models,
+# averaged. Each model's mistakes are its own, so the average keeps what they
+# agree on. The instrumental is the mix minus that, sample-exact.
+#
+# Models: captainstems models fetch mel-band-roformer-deux bs-roformer-resurrection mel-band-roformer-vocals-kim
+version: 1
+name: vocals-ensemble
+defaults:
+  device: auto
+  dtype: auto
+  normalize: true
+
+nodes:
+  deux:
+    op: separate
+    model: mel-band-roformer-deux        # Mel-Band RoFormer, 2026
+    targets: [vocals]
+
+  resurrection:
+    op: separate
+    model: bs-roformer-resurrection      # BS-RoFormer, 2026
+    targets: [vocals]
+
+  kim:
+    op: separate
+    model: mel-band-roformer-vocals-kim  # Mel-Band RoFormer, 2024: a different training set
+    targets: [vocals]
+
+  vocals:
+    op: ensemble
+    inputs: [deux.vocals, resurrection.vocals, kim.vocals]
+    params: {method: avg, weights: [0.4, 0.35, 0.25]}
+
+  inst:
+    op: subtract
+    inputs: {a: mix, b: vocals.out}
+
+  check:
+    op: analyze
+    inputs: {mix: mix, stems: [vocals.out, inst.out]}
+
+  out:
+    op: export
+    inputs: [vocals.out, inst.out]
+    params: {format: flac, bit_depth: 24, naming: "{track}_{stem}"}
