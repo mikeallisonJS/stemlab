@@ -8,11 +8,16 @@ The first release is 1.0. The code is a rewrite around a recipe engine of an ear
 that was never released; it is kept in [`archive/v1/`](archive/v1/). Plan and decisions:
 [Stemlab v2 handoff](https://claude.ai/artifact/FoargYKnKDffjnQYnFNWzF).
 
+Stemlab was called CaptainStems before its first release. The package, the CLI (`stemlab`), the
+environment variables (`STEMLAB_*`) and the data folder (`~/.stemlab`) all carry the new name; an existing
+`~/.captainstems` is renamed to `~/.stemlab` on first start, so downloaded models are kept.
+
 | Part | Where | What |
 | --- | --- | --- |
 | Engine and CLI | `stemlab/` | Recipes, runner, cache, model registry, backends |
 | API server | `stemlab/server/` | FastAPI and WebSocket, local only |
 | UI | `app/` | React: recipe graph, run queue, results |
+| Desktop shell | `app/src/main/` | Electron: starts the server, first-run setup, auto-update |
 
 ## Setup
 
@@ -182,11 +187,37 @@ server then serves it.
   reinstall the model libraries from there, a browser shows the `bootstrap` command to run.
 
 The server listens on the local machine only and has no authentication. The desktop app (`app/src/main/`)
-spawns it on a free port, offers to run `bootstrap` on the first start and stops it on exit. `cd app && pnpm dist`
-builds the installer (NSIS, AppImage or dmg): the installed app creates its own Python environment with uv on
-the first start, so the installer stays small and one build serves every GPU. A `v*` tag builds all
-three on GitHub Actions, signs the Windows build when the signing secrets are set, and publishes the
-auto-update feed the installed apps poll (`app/src/main/README.md`). Tags come from the release flow below.
+spawns it on a free port, offers to run `bootstrap` on the first start and stops it on exit.
+
+## Building the installer
+
+Needs everything from Setup plus Node 24 and pnpm 11, the MSST submodule checked out
+(`git submodule update --init`), and FFmpeg on the `PATH` (or named in `FFMPEG`) to bundle it.
+
+```
+cd app
+pnpm i
+pnpm dist
+```
+
+`pnpm dist` builds the UI and the Electron shell, then `scripts/prepare-engine.mjs` assembles
+`app/build/engine`: the engine as a wheel (`uv build`), `recipes/`, the MSST submodule, the built UI and
+FFmpeg. electron-builder packs that beside the shell and writes the installer for the current OS to
+`app/release/`:
+
+| OS | Installer |
+| --- | --- |
+| Windows | `Stemlab-Setup-<version>.exe` (NSIS) |
+| Linux | `Stemlab-<version>.AppImage` |
+| macOS | `Stemlab-<version>.dmg`, plus a `.zip` for auto-update |
+
+No Python, torch or model ships in the installer. On its first start the installed app downloads a pinned
+uv, creates its own Python environment in the user data folder, installs the bundled wheel and then offers
+`bootstrap` for the GPU libraries, so the installer stays small and one build serves every GPU.
+
+A local build is unsigned unless the six Azure Artifact Signing variables are set; macOS builds are not
+signed or notarized yet. Signing, the auto-update feed and the variables that point a checkout at a
+packaged-style setup are described in [`app/src/main/README.md`](app/src/main/README.md).
 
 ## Development
 
@@ -203,7 +234,8 @@ never modified.
 ## Releases
 
 Changeset-style, the same flow as Cadent: each PR declares its release intent as a fragment, a
-bot-maintained release PR aggregates them, merging that PR ships.
+bot-maintained release PR aggregates them, merging that PR ships. Versions are never bumped and `v*` tags
+are never pushed by hand. The version in the tree is `1.0.0.dev0`, so the first release PR is `v1.0.0`.
 
 1. A PR that touches `stemlab/`, the app, `recipes/`, `third_party/` or `pyproject.toml` adds one file
    `changelog.d/<issue>.<type>.md` (or `+<slug>.<type>.md` without an issue). `changelog-check` fails the
@@ -221,6 +253,13 @@ bot-maintained release PR aggregates them, merging that PR ships.
 
 `uv run --with towncrier python scripts/release.py next-version` shows what the pending fragments add
 up to.
+
+The release build needs repository secrets, shared with Cadent:
+
+| Secrets | Needed for | Without them |
+| --- | --- | --- |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_HOST` | Uploading the auto-update feed to Cloudflare R2 under `stemlab/` | The tag build fails |
+| `AZURE_SIGN_TENANT_ID`, `AZURE_SIGN_CLIENT_ID`, `AZURE_SIGN_CLIENT_SECRET`, `AZURE_SIGN_ENDPOINT`, `AZURE_SIGN_ACCOUNT`, `AZURE_SIGN_PROFILE` | Signing the Windows build | Unsigned Windows build (SmartScreen warns); a partial set fails |
 
 ## Support
 
