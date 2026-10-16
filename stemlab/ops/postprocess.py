@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from captainstems.ops import OpResult
-from captainstems.ops.separate import separate_audio
+from stemlab.ops import OpResult
+from stemlab.ops.separate import separate_audio
 
 
 def run(ctx, name: str, node, plan) -> OpResult:

@@ -25,13 +25,13 @@ name: Release
 # Tag builds also publish the auto-update feed - the installers, their
 # blockmaps and latest*.yml - to Cloudflare R2, gated the same way on the five
 # secrets Cadent's workflow uses for the same bucket. The installed app checks
-# https://<R2_PUBLIC_HOST>/captainstems/ (app/electron-builder.cjs), which
+# https://<R2_PUBLIC_HOST>/stemlab/ (app/electron-builder.cjs), which
 # must be a custom domain on the bucket: Cloudflare rate-limits r2.dev.
 #
 #   R2_ACCOUNT_ID         Cloudflare account id (the r2.cloudflarestorage host)
 #   R2_ACCESS_KEY_ID      R2 API token, Object Read & Write on the bucket
 #   R2_SECRET_ACCESS_KEY  its secret
-#   R2_BUCKET             bucket name, shared across apps; this writes under captainstems/
+#   R2_BUCKET             bucket name, shared across apps; this writes under stemlab/
 #   R2_PUBLIC_HOST        custom domain on the bucket, e.g. downloads.example.com
 on:
   push:
@@ -117,9 +117,9 @@ jobs:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_SIGN_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_SIGN_CLIENT_SECRET }}
           # Read by app/electron-builder.cjs
-          CAPTAINSTEMS_SIGN_ENDPOINT: ${{ secrets.AZURE_SIGN_ENDPOINT }}
-          CAPTAINSTEMS_SIGN_ACCOUNT: ${{ secrets.AZURE_SIGN_ACCOUNT }}
-          CAPTAINSTEMS_SIGN_PROFILE: ${{ secrets.AZURE_SIGN_PROFILE }}
+          STEMLAB_SIGN_ENDPOINT: ${{ secrets.AZURE_SIGN_ENDPOINT }}
+          STEMLAB_SIGN_ACCOUNT: ${{ secrets.AZURE_SIGN_ACCOUNT }}
+          STEMLAB_SIGN_PROFILE: ${{ secrets.AZURE_SIGN_PROFILE }}
 
       - name: Verify the installer's signature
         if: runner.os == 'Windows' && steps.signing.outputs.signed == 'true'
@@ -136,7 +136,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: CaptainStems-${{ matrix.name }}
+          name: Stemlab-${{ matrix.name }}
           path: |
             app/release/*.exe
             app/release/*.AppImage
@@ -181,16 +181,16 @@ jobs:
           # an installed app may already be downloading.
           for file in *.exe *.AppImage *.dmg *.zip *.blockmap; do
             [ -e "$file" ] || continue
-            aws s3api put-object --bucket "$R2_BUCKET" --key "captainstems/$file" --body "$file"               --if-none-match '*' --content-type application/octet-stream --endpoint-url "$endpoint"
+            aws s3api put-object --bucket "$R2_BUCKET" --key "stemlab/$file" --body "$file"               --if-none-match '*' --content-type application/octet-stream --endpoint-url "$endpoint"
           done
           # latest*.yml is the pointer the apps poll, and the one file that is overwritten
           for file in latest*.yml; do
             [ -e "$file" ] || continue
-            aws s3api put-object --bucket "$R2_BUCKET" --key "captainstems/$file" --body "$file"               --content-type text/yaml --cache-control "max-age=300" --endpoint-url "$endpoint"
+            aws s3api put-object --bucket "$R2_BUCKET" --key "stemlab/$file" --body "$file"               --content-type text/yaml --cache-control "max-age=300" --endpoint-url "$endpoint"
           done
           for file in latest*.yml; do
             [ -e "$file" ] || continue
-            url="https://$R2_PUBLIC_HOST/captainstems/$file"
+            url="https://$R2_PUBLIC_HOST/stemlab/$file"
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-redirs 0 "$url")
             if [ "$code" != "200" ]; then
               echo "::error::$url answered $code, not 200 - is the custom domain attached to the bucket?"

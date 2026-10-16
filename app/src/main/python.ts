@@ -1,7 +1,7 @@
 // The Python environment the packaged app owns, created under the user data
 // folder on the first start: a pinned uv, a uv-managed CPython and the
-// captainstems wheel bundled with the app. The GPU-specific libraries come
-// later through `captainstems bootstrap`, from the loading screen.
+// stemlab wheel bundled with the app. The GPU-specific libraries come
+// later through `stemlab bootstrap`, from the loading screen.
 //
 // A development checkout needs none of this: main.ts uses the repository's
 // .venv there.
@@ -19,7 +19,7 @@ export interface Python {
   command: string;
   args: string[];
   describe: string;
-  /** The folder the server runs in and, for the packaged app, CAPTAINSTEMS_ROOT */
+  /** The folder the server runs in and, for the packaged app, STEMLAB_ROOT */
   root: string;
   env: NodeJS.ProcessEnv;
 }
@@ -125,7 +125,7 @@ export function bundledFfmpeg(engineDir: string): string | null {
 }
 
 /**
- * Make sure uv, the Python environment and the bundled captainstems wheel are
+ * Make sure uv, the Python environment and the bundled stemlab wheel are
  * in place under `dataDir`, doing only what is missing or outdated.
  */
 export async function managedPython(engineDir: string, dataDir: string, progress: Progress): Promise<Python> {
@@ -168,16 +168,16 @@ export async function managedPython(engineDir: string, dataDir: string, progress
     await run(uv, ["venv", "--python", PYTHON_VERSION, "--managed-python", "--seed", venv], env, progress.log);
   }
 
-  const wheel = fs.readdirSync(engineDir).find((name) => name.startsWith("captainstems-") && name.endsWith(".whl"));
-  if (!wheel) throw new Error(`No captainstems wheel in ${engineDir}. The app was not built with prepare-engine.`);
+  const wheel = fs.readdirSync(engineDir).find((name) => name.startsWith("stemlab-") && name.endsWith(".whl"));
+  if (!wheel) throw new Error(`No stemlab wheel in ${engineDir}. The app was not built with prepare-engine.`);
   const wheelPath = path.join(engineDir, wheel);
-  const installed = path.join(venv, "captainstems.wheel.sha256");
+  const installed = path.join(venv, "stemlab.wheel.sha256");
   const digest = sha256(wheelPath);
   if (readText(installed) !== digest) {
-    progress.status("Installing CaptainStems…");
+    progress.status("Installing Stemlab…");
     await run(
       uv,
-      ["pip", "install", "--python", python, "--reinstall-package", "captainstems", `captainstems[server] @ ${pathToFileURL(wheelPath).href}`],
+      ["pip", "install", "--python", python, "--reinstall-package", "stemlab", `stemlab[server] @ ${pathToFileURL(wheelPath).href}`],
       env,
       progress.log,
     );
@@ -187,16 +187,16 @@ export async function managedPython(engineDir: string, dataDir: string, progress
   const ffmpeg = bundledFfmpeg(engineDir);
   return {
     command: python,
-    args: ["-m", "captainstems"],
+    args: ["-m", "stemlab"],
     describe: python,
     root: engineDir,
     env: {
-      CAPTAINSTEMS_ROOT: engineDir,
-      CAPTAINSTEMS_UV: uv,
+      STEMLAB_ROOT: engineDir,
+      STEMLAB_UV: uv,
       UV_PYTHON_INSTALL_DIR: env.UV_PYTHON_INSTALL_DIR,
       UV_CACHE_DIR: env.UV_CACHE_DIR,
       UV_NO_PROGRESS: "1",
-      ...(ffmpeg ? { CAPTAINSTEMS_FFMPEG: ffmpeg } : {}),
+      ...(ffmpeg ? { STEMLAB_FFMPEG: ffmpeg } : {}),
     },
   };
 }

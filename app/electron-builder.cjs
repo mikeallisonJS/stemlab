@@ -13,9 +13,9 @@
 //   AZURE_TENANT_ID               the Entra tenant holding the signing identity
 //   AZURE_CLIENT_ID               app registration with the Code Signing Certificate Profile Signer role
 //   AZURE_CLIENT_SECRET           its client secret (read by the signing module, never by us)
-//   CAPTAINSTEMS_SIGN_ENDPOINT    regional URI, e.g. https://eus.codesigning.azure.net/
-//   CAPTAINSTEMS_SIGN_ACCOUNT     Artifact Signing account name
-//   CAPTAINSTEMS_SIGN_PROFILE     certificate profile name within that account
+//   STEMLAB_SIGN_ENDPOINT    regional URI, e.g. https://eus.codesigning.azure.net/
+//   STEMLAB_SIGN_ACCOUNT     Artifact Signing account name
+//   STEMLAB_SIGN_PROFILE     certificate profile name within that account
 //
 // electron-builder installs the TrustedSigning PowerShell module on the build
 // machine and signs with Invoke-TrustedSigning; the private key never leaves
@@ -23,7 +23,7 @@
 // secrets onto these names.
 
 const credentials = ["AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET"];
-const target = ["CAPTAINSTEMS_SIGN_ENDPOINT", "CAPTAINSTEMS_SIGN_ACCOUNT", "CAPTAINSTEMS_SIGN_PROFILE"];
+const target = ["STEMLAB_SIGN_ENDPOINT", "STEMLAB_SIGN_ACCOUNT", "STEMLAB_SIGN_PROFILE"];
 
 function windowsSigning() {
   const names = [...credentials, ...target];
@@ -36,12 +36,12 @@ function windowsSigning() {
     const missing = names.filter((name) => !process.env[name]).join(", ");
     throw new Error(`Windows signing needs all of ${names.join(", ")}; missing: ${missing}`);
   }
-  console.log(`electron-builder: signing with Artifact Signing account ${process.env.CAPTAINSTEMS_SIGN_ACCOUNT}`);
+  console.log(`electron-builder: signing with Artifact Signing account ${process.env.STEMLAB_SIGN_ACCOUNT}`);
   return {
     azureSignOptions: {
-      endpoint: process.env.CAPTAINSTEMS_SIGN_ENDPOINT,
-      codeSigningAccountName: process.env.CAPTAINSTEMS_SIGN_ACCOUNT,
-      certificateProfileName: process.env.CAPTAINSTEMS_SIGN_PROFILE,
+      endpoint: process.env.STEMLAB_SIGN_ENDPOINT,
+      codeSigningAccountName: process.env.STEMLAB_SIGN_ACCOUNT,
+      certificateProfileName: process.env.STEMLAB_SIGN_PROFILE,
       timestampRfc3161: "http://timestamp.acs.microsoft.com",
     },
     signingHashAlgorithms: ["sha256"],
@@ -53,11 +53,11 @@ function windowsSigning() {
 // workflow uploads them to Cloudflare R2 behind this host, the same bucket
 // and secrets as Cadent. The repository is private, so GitHub releases
 // cannot serve the feed (that would need a token inside the app).
-const UPDATE_URL = process.env.CAPTAINSTEMS_UPDATE_URL || "https://downloads.mikeallisonjs.com/captainstems";
+const UPDATE_URL = process.env.STEMLAB_UPDATE_URL || "https://downloads.mikeallisonjs.com/stemlab";
 
 module.exports = {
-  appId: "dev.captainstems.app",
-  productName: "CaptainStems",
+  appId: "dev.stemlab.app",
+  productName: "Stemlab",
   directories: { output: "release", buildResources: "build/resources" },
   files: ["dist-electron/**", "package.json"],
   // The engine: the wheel, recipes, MSST, the built UI and FFmpeg (scripts/prepare-engine.mjs)
@@ -67,7 +67,7 @@ module.exports = {
   publish: [{ provider: "generic", url: UPDATE_URL, channel: "latest" }],
   win: {
     target: ["nsis"],
-    artifactName: "CaptainStems-Setup-${version}.${ext}",
+    artifactName: "Stemlab-Setup-${version}.${ext}",
     ...windowsSigning(),
   },
   nsis: {
@@ -75,7 +75,7 @@ module.exports = {
     allowToChangeInstallationDirectory: true,
     deleteAppDataOnUninstall: false,
   },
-  linux: { target: ["AppImage"], artifactName: "CaptainStems-${version}.${ext}", category: "AudioVideo" },
+  linux: { target: ["AppImage"], artifactName: "Stemlab-${version}.${ext}", category: "AudioVideo" },
   // The zip is what electron-updater downloads on macOS; the dmg is for people
-  mac: { target: ["dmg", "zip"], artifactName: "CaptainStems-${version}.${ext}", category: "public.app-category.music" },
+  mac: { target: ["dmg", "zip"], artifactName: "Stemlab-${version}.${ext}", category: "public.app-category.music" },
 };

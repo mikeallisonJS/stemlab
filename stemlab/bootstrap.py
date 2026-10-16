@@ -15,7 +15,7 @@ import subprocess
 import sys
 from collections.abc import Callable
 
-from captainstems.backends import device
+from stemlab.backends import device
 
 # Verified with the bundled backends
 TORCH_VERSION = ">=2.6,<2.15"
@@ -55,9 +55,9 @@ def onnxruntime_package(flavor: str) -> str:
 def installer() -> list[str]:
     """
     The command prefix that installs into the running environment: uv when there
-    is one (the packaged app names its own in CAPTAINSTEMS_UV), else pip.
+    is one (the packaged app names its own in STEMLAB_UV), else pip.
     """
-    uv = os.environ.get("CAPTAINSTEMS_UV") or shutil.which("uv")
+    uv = os.environ.get("STEMLAB_UV") or shutil.which("uv")
     if uv:
         return [uv, "pip", "install", "--python", sys.executable]
     return [sys.executable, "-m", "pip", "install"]
@@ -80,7 +80,7 @@ def torch_requirement(flavor: str) -> str:
         if not target:
             raise ValueError(
                 "ROCm on Windows needs the GPU target AMD builds its wheels for, and this GPU is not "
-                "in the list of known ones. Set it with `captainstems doctor --set-rocm-target gfx1151` "
+                "in the list of known ones. Set it with `stemlab doctor --set-rocm-target gfx1151` "
                 "(gfx1151: Ryzen AI Max, gfx1150: Ryzen AI 300, gfx110X: RX 7000, gfx120X: RX 9000)."
             )
         return f"torch[device-{target}]{TORCH_VERSION}"

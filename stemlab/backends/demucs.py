@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-from captainstems.backends.base import (
+from stemlab.backends.base import (
     COMMON_PARAMS,
     Backend,
     BackendError,

@@ -16,10 +16,10 @@ from collections import deque
 from pathlib import Path
 from typing import Any
 
-from captainstems import runner
-from captainstems.backends.base import Cancelled
-from captainstems.recipe import MIX, Recipe
-from captainstems.registry import Registry
+from stemlab import runner
+from stemlab.backends.base import Cancelled
+from stemlab.recipe import MIX, Recipe
+from stemlab.registry import Registry
 
 QUEUED, RUNNING, FINISHED, FAILED, CANCELLED = "queued", "running", "finished", "failed", "cancelled"
 ACTIVE = (QUEUED, RUNNING)
@@ -160,7 +160,7 @@ class JobManager:
         self._queue: deque[Job] = deque()
         self._condition = threading.Condition()
         self._stopping = False
-        self._thread = threading.Thread(target=self._work, name="captainstems-jobs", daemon=True)
+        self._thread = threading.Thread(target=self._work, name="stemlab-jobs", daemon=True)
         self._thread.start()
 
     def submit(
@@ -182,7 +182,7 @@ class JobManager:
 
     def open_run(self, run_json: Path) -> Job:
         """Register a finished run from its run.json, to look at its results again."""
-        from captainstems.recipe import parse
+        from stemlab.recipe import parse
 
         record = json.loads(Path(run_json).read_text(encoding="utf-8"))
         if "recipe" not in record or "nodes" not in record:

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from captainstems import audio, dsp
-from captainstems.ops import OpResult
+from stemlab import audio, dsp
+from stemlab.ops import OpResult
 
 
 def combine(inputs: list[np.ndarray], method: str, weights: list[float] | None = None) -> np.ndarray:

@@ -25,11 +25,11 @@ from typing import Any
 import numpy as np
 import soundfile as sf
 
-from captainstems import __version__, audio, paths
-from captainstems.backends import base, device
-from captainstems.backends.base import Cancelled
-from captainstems.ops import analyze, ensemble, export, postprocess, separate, subtract
-from captainstems.recipe import (
+from stemlab import __version__, audio, paths
+from stemlab.backends import base, device
+from stemlab.backends.base import Cancelled
+from stemlab.ops import analyze, ensemble, export, postprocess, separate, subtract
+from stemlab.recipe import (
     MIX,
     OUTPUT_NAME,
     Recipe,
@@ -37,7 +37,7 @@ from captainstems.recipe import (
     node_references,
     split_reference,
 )
-from captainstems.registry import Registry
+from stemlab.registry import Registry
 
 # Bump when a change makes previously cached stems wrong
 CACHE_VERSION = 1
@@ -507,7 +507,7 @@ def run_recipe(
     )
     staging = out_dir / f".staging-{run_id}"
     record: dict = {
-        "captainstems": __version__,
+        "stemlab": __version__,
         "run_id": run_id,
         "status": "running",
         "started": _now(),
@@ -668,7 +668,7 @@ def recipe_from_run(record: dict) -> Recipe:
     Rebuild the recipe of a finished run with every parameter pinned to the
     value it resolved to, so the run can be repeated exactly.
     """
-    from captainstems.recipe import parse
+    from stemlab.recipe import parse
 
     data = json.loads(json.dumps(record["recipe"]))
     data.pop("defaults", None)

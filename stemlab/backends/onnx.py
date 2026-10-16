@@ -16,8 +16,8 @@ from typing import Any
 
 import numpy as np
 
-from captainstems import dsp
-from captainstems.backends.base import Backend, BackendError, Model, ParamSpec, ProgressFn, check_cancel
+from stemlab import dsp
+from stemlab.backends.base import Backend, BackendError, Model, ParamSpec, ProgressFn, check_cancel
 
 HOP = 1024
 
@@ -34,7 +34,7 @@ def _runtime():
     try:
         import onnxruntime as ort
     except ImportError:
-        raise BackendError("onnxruntime is not installed. Run: captainstems bootstrap") from None
+        raise BackendError("onnxruntime is not installed. Run: stemlab bootstrap") from None
     return ort
 
 
@@ -220,7 +220,7 @@ class OnnxBackend(Backend):
         if device != "cpu" and session.get_providers()[0] != PROVIDERS[device]:
             raise BackendError(
                 f"onnxruntime could not start its {device} provider for '{info.id}' and would silently run on the "
-                "CPU. Check the GPU libraries with `captainstems doctor`, or set device: cpu."
+                "CPU. Check the GPU libraries with `stemlab doctor`, or set device: cpu."
             )
 
         shape = session.get_inputs()[0].shape

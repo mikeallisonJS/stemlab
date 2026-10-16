@@ -7,21 +7,35 @@ from pathlib import Path
 
 # The repository, where the recipes, the MSST submodule and the built UI live.
 # The packaged app installs the engine as a wheel and ships those as resources:
-# it points CAPTAINSTEMS_ROOT at a folder laid out the same way.
+# it points STEMLAB_ROOT at a folder laid out the same way.
 REPO_ROOT = (
-    Path(os.environ["CAPTAINSTEMS_ROOT"])
-    if os.environ.get("CAPTAINSTEMS_ROOT")
+    Path(os.environ["STEMLAB_ROOT"])
+    if os.environ.get("STEMLAB_ROOT")
     else Path(__file__).resolve().parent.parent
 )
 MSST_DIR = REPO_ROOT / "third_party" / "msst"
 
 
 def home() -> Path:
-    """Root for everything CaptainStems stores per user. Override with CAPTAINSTEMS_HOME."""
-    override = os.environ.get("CAPTAINSTEMS_HOME")
-    root = Path(override) if override else Path.home() / ".captainstems"
+    """Root for everything Stemlab stores per user. Override with STEMLAB_HOME."""
+    override = os.environ.get("STEMLAB_HOME")
+    root = Path(override) if override else Path.home() / ".stemlab"
+    if not override and not root.exists():
+        _adopt_legacy_home(root)
     root.mkdir(parents=True, exist_ok=True)
     return root
+
+
+def _adopt_legacy_home(root: Path) -> None:
+    """Stemlab was CaptainStems before its first release: take over `~/.captainstems`
+    (downloaded models, cache, outputs) by renaming it, once, instead of fetching everything again."""
+    legacy = root.parent / ".captainstems"
+    if not legacy.is_dir():
+        return
+    try:
+        legacy.rename(root)
+    except OSError:
+        pass  # another drive or no permission: start fresh, the old folder stays
 
 
 def models_dir() -> Path:

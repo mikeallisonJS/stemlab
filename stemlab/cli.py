@@ -1,4 +1,4 @@
-"""The `captainstems` command line."""
+"""The `stemlab` command line."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from captainstems import __version__
+from stemlab import __version__
 
 app = typer.Typer(help="Recipe-driven stem separation.", no_args_is_help=True, add_completion=False)
 console = Console()
@@ -34,8 +34,8 @@ def doctor(
     ),
 ) -> None:
     """Show the detected OS, GPU, torch flavor and backend versions."""
-    from captainstems import bootstrap
-    from captainstems.backends import device
+    from stemlab import bootstrap
+    from stemlab.backends import device
 
     if set_flavor is not None:
         if set_flavor == "auto":
@@ -57,7 +57,7 @@ def doctor(
         print(json.dumps(info.to_dict(), indent=2))
         return
 
-    table = Table(title=f"CaptainStems {__version__}", show_header=False, title_justify="left")
+    table = Table(title=f"Stemlab {__version__}", show_header=False, title_justify="left")
     table.add_column(style="bold")
     table.add_column()
     table.add_row("OS", f"{info.os} {info.os_version} ({info.machine})")
@@ -104,7 +104,7 @@ def doctor(
     expected_gpu = info.flavor in ("cuda", "rocm")
     if not torch["version"] or (expected_gpu and not torch["cuda"]):
         console.print("\nThe model libraries are missing or do not match the GPU. Install them with:")
-        console.print("  [bold]captainstems bootstrap[/bold]\nwhich runs:")
+        console.print("  [bold]stemlab bootstrap[/bold]\nwhich runs:")
         try:
             for command in bootstrap.plan(info.flavor):
                 console.print("  " + " ".join(command), highlight=False, soft_wrap=True)
@@ -118,8 +118,8 @@ def bootstrap_command(
     dry_run: bool = typer.Option(False, "--dry-run", help="Only print the commands"),
 ) -> None:
     """Install torch for this machine's GPU, the model libraries and onnxruntime."""
-    from captainstems import bootstrap
-    from captainstems.backends import device
+    from stemlab import bootstrap
+    from stemlab.backends import device
 
     chosen = flavor or device.chosen_flavor()[0]
     try:
@@ -133,7 +133,7 @@ def bootstrap_command(
     console.print(f"Installing the [bold]{chosen}[/bold] flavor into {sys.prefix}")
     if not bootstrap.run(chosen, log=lambda line: console.print(line, highlight=False, soft_wrap=True)):
         _fail("Bootstrap failed. The command above can be rerun by hand.")
-    console.print("[green]Done.[/green] Run [bold]captainstems doctor[/bold] to check the result.")
+    console.print("[green]Done.[/green] Run [bold]stemlab doctor[/bold] to check the result.")
 
 
 # Running recipes ------------------------------------------------------------------
@@ -141,8 +141,8 @@ def bootstrap_command(
 
 def _load_recipe(path: Path):
     """A recipe YAML, or the run.json of an earlier run (repeats it with its exact parameters)."""
-    from captainstems import recipe as recipe_module
-    from captainstems import runner
+    from stemlab import recipe as recipe_module
+    from stemlab import runner
 
     if path.suffix.lower() == ".json":
         try:
@@ -166,11 +166,11 @@ def run(
     """Run a recipe on one or more audio files."""
     from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
 
-    from captainstems import recipe as recipe_module
-    from captainstems import runner
-    from captainstems.audio import AudioError
-    from captainstems.backends.base import BackendError, Cancelled
-    from captainstems.registry import Registry, RegistryError
+    from stemlab import recipe as recipe_module
+    from stemlab import runner
+    from stemlab.audio import AudioError
+    from stemlab.backends.base import BackendError, Cancelled
+    from stemlab.registry import Registry, RegistryError
 
     try:
         recipe = _load_recipe(recipe_path)
@@ -279,9 +279,9 @@ def run(
 @app.command()
 def validate(recipe_path: Path = typer.Argument(..., metavar="RECIPE")) -> None:
     """Check a recipe against the installed models and show the resolved parameters."""
-    from captainstems import recipe as recipe_module
-    from captainstems import runner
-    from captainstems.registry import Registry
+    from stemlab import recipe as recipe_module
+    from stemlab import runner
+    from stemlab.registry import Registry
 
     try:
         recipe = _load_recipe(recipe_path)
@@ -300,8 +300,8 @@ def validate(recipe_path: Path = typer.Argument(..., metavar="RECIPE")) -> None:
 @app.command()
 def schema(backends: bool = typer.Option(False, "--backends", help="Include each backend's parameter schema")) -> None:
     """Print the JSON Schema of the recipe format."""
-    from captainstems import recipe as recipe_module
-    from captainstems.backends import base
+    from stemlab import recipe as recipe_module
+    from stemlab.backends import base
 
     data: dict = {"recipe": recipe_module.json_schema()}
     if backends:
@@ -323,17 +323,17 @@ def serve(
     try:
         import uvicorn
 
-        from captainstems.server.app import UI_DIST, create_app
+        from stemlab.server.app import UI_DIST, create_app
     except ImportError as e:
         _fail(f"The server extras are not installed ({e}). Run: uv sync --inexact --extra server")
     if host not in ("127.0.0.1", "localhost", "::1"):
         console.print("[yellow]Warning: the API has no authentication. Only expose it on a network you trust.[/yellow]")
-    console.print(f"CaptainStems API on http://{host}:{port}")
+    console.print(f"Stemlab API on http://{host}:{port}")
     if UI_DIST.is_dir():
         console.print(f"UI: http://{host}:{port}/")
     else:
         console.print("UI not built. For development: cd app && pnpm i && pnpm dev")
-    from captainstems.server.app import LOCAL_HOSTS
+    from stemlab.server.app import LOCAL_HOSTS
 
     # Requests must be addressed to a name the server was asked to answer to
     if host in ("0.0.0.0", "::"):
@@ -361,7 +361,7 @@ def _size(num_bytes: float) -> str:
 @models_app.command("list")
 def models_list(as_json: bool = typer.Option(False, "--json")) -> None:
     """List installed models and the curated ones that can be fetched."""
-    from captainstems.registry import Registry
+    from stemlab.registry import Registry
 
     registry = Registry()
     rows = registry.catalog()
@@ -401,7 +401,7 @@ def models_fetch(
     """Download curated models and verify their checksums."""
     from rich.progress import BarColumn, DownloadColumn, Progress, TextColumn, TransferSpeedColumn
 
-    from captainstems.registry import Registry, RegistryError, load_curated
+    from stemlab.registry import Registry, RegistryError, load_curated
 
     registry = Registry()
     if ids == ["all"]:
@@ -452,7 +452,7 @@ def models_add(
     """Register your own model: copies the files into the registry and writes its manifest."""
     from pydantic import ValidationError
 
-    from captainstems.registry import Manifest, Registry, RegistryError
+    from stemlab.registry import Manifest, Registry, RegistryError
 
     def pairs(items: list[str], what: str) -> dict:
         result = {}
@@ -499,7 +499,7 @@ def models_remove(
     model_id: str = typer.Argument(..., metavar="ID"), yes: bool = typer.Option(False, "--yes", "-y", help="Do not ask")
 ) -> None:
     """Delete a model and its files from the registry."""
-    from captainstems.registry import Registry, RegistryError
+    from stemlab.registry import Registry, RegistryError
 
     registry = Registry()
     if not yes:
@@ -514,7 +514,7 @@ def models_remove(
 @models_app.command("verify")
 def models_verify(ids: list[str] = typer.Argument(None, metavar="[ID...]")) -> None:
     """Check installed models against the checksums in their manifests."""
-    from captainstems.registry import Registry, RegistryError
+    from stemlab.registry import Registry, RegistryError
 
     registry = Registry()
     failed = False
@@ -541,7 +541,7 @@ app.add_typer(cache_app, name="cache")
 @cache_app.command("info")
 def cache_info() -> None:
     """Show where the cache is and how big it has grown."""
-    from captainstems.runner import Cache
+    from stemlab.runner import Cache
 
     cache = Cache()
     console.print(f"{cache.root}: {_size(cache.size())}")
@@ -552,8 +552,8 @@ def cache_clear() -> None:
     """Delete all cached intermediate stems and the copies of files dropped onto the UI."""
     import shutil
 
-    from captainstems import paths
-    from captainstems.runner import Cache
+    from stemlab import paths
+    from stemlab.runner import Cache
 
     freed = Cache().clear()
     uploads = paths.uploads_dir()

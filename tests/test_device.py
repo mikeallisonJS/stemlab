@@ -3,9 +3,9 @@ import json
 import pytest
 from typer.testing import CliRunner
 
-from captainstems import bootstrap
-from captainstems.backends import device
-from captainstems.cli import app
+from stemlab import bootstrap
+from stemlab.backends import device
+from stemlab.cli import app
 
 runner = CliRunner()
 
@@ -178,18 +178,18 @@ def test_bootstrap_plan_for_rocm_on_windows_uses_amd_wheels(monkeypatch, home):
 
 def test_packaged_app_overrides(monkeypatch, tmp_path, home):
     # The packaged app installs the engine as a wheel and ships recipes, MSST and
-    # the UI in a folder it names in CAPTAINSTEMS_ROOT; bootstrap uses its uv
+    # the UI in a folder it names in STEMLAB_ROOT; bootstrap uses its uv
     import importlib
 
-    from captainstems import paths
+    from stemlab import paths
 
-    monkeypatch.setenv("CAPTAINSTEMS_ROOT", str(tmp_path / "engine"))
+    monkeypatch.setenv("STEMLAB_ROOT", str(tmp_path / "engine"))
     importlib.reload(paths)
     assert paths.REPO_ROOT == tmp_path / "engine"
     assert paths.MSST_DIR == tmp_path / "engine" / "third_party" / "msst"
-    monkeypatch.delenv("CAPTAINSTEMS_ROOT")
+    monkeypatch.delenv("STEMLAB_ROOT")
     importlib.reload(paths)
     assert (paths.REPO_ROOT / "pyproject.toml").is_file()
 
-    monkeypatch.setenv("CAPTAINSTEMS_UV", str(tmp_path / "uv.exe"))
+    monkeypatch.setenv("STEMLAB_UV", str(tmp_path / "uv.exe"))
     assert bootstrap.installer()[:3] == [str(tmp_path / "uv.exe"), "pip", "install"]

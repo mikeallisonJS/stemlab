@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from captainstems import recipe
-from captainstems.recipe import RecipeError
+from stemlab import recipe
+from stemlab.recipe import RecipeError
 
 WORKED_EXAMPLE = Path(__file__).parent.parent / "recipes" / "full-split-v1.yaml"
 
@@ -157,7 +157,7 @@ def test_json_schema_describes_every_op():
 
 
 def test_backend_param_schema():
-    from captainstems.backends.base import ParamSpec
+    from stemlab.backends.base import ParamSpec
 
     schema = recipe.backend_param_schema(
         {

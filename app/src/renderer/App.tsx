@@ -9,7 +9,7 @@ import { RunView } from "./views/RunView";
 
 type Tab = "recipe" | "run" | "results" | "models";
 
-const STORED_RECIPE = "captainstems.recipe";
+const STORED_RECIPE = "stemlab.recipe";
 const BLANK: RecipeData = { name: "new-recipe", nodes: {} };
 
 function storedRecipe(): RecipeData | null {
@@ -151,7 +151,7 @@ export function App() {
   if (fatal && !schema) {
     return (
       <div className="fatal">
-        <h1>CaptainStems</h1>
+        <h1>Stemlab</h1>
         <div className="banner error" role="alert">{fatal}</div>
         <button onClick={() => window.location.reload()}>Try again</button>
       </div>
@@ -162,7 +162,7 @@ export function App() {
   return (
     <div className="app">
       <header>
-        <h1>CaptainStems</h1>
+        <h1>Stemlab</h1>
         <nav>
           {(["recipe", "run", "results", "models"] as Tab[]).map((item) => (
             <button key={item} className={tab === item ? "tab on" : "tab"} onClick={() => setTab(item)} aria-current={tab === item}>
@@ -175,6 +175,10 @@ export function App() {
         <span className="muted">
           {system ? `${system.gpu ?? "CPU"} · ${system.flavor} · v${system.version}` : ""}
         </span>
+        <a className="muted" href="https://github.com/sponsors/mikeallisonJS" target="_blank" rel="noreferrer"
+          title="Stemlab is free; sponsoring on GitHub keeps it going">Sponsor</a>
+        <a className="muted" href="https://captainssounds.com/donate" target="_blank" rel="noreferrer"
+          title="Stemlab is free; a donation keeps it going">Donate</a>
       </header>
 
       <main>

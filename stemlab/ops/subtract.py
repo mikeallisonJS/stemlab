@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from captainstems import audio
-from captainstems.ops import OpResult
+from stemlab import audio
+from stemlab.ops import OpResult
 
 
 def run(ctx, name: str, node, plan) -> OpResult:

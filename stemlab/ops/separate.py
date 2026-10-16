@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from captainstems import audio
-from captainstems.ops import OpResult
+from stemlab import audio
+from stemlab.ops import OpResult
 
 
 def separate_audio(ctx, name: str, plan, source: np.ndarray) -> tuple[dict[str, np.ndarray], dict]:

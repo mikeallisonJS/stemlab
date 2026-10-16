@@ -33,12 +33,12 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from captainstems import __version__, audio, bootstrap, dsp, paths, runner
-from captainstems import recipe as recipe_module
-from captainstems.backends import base, device
-from captainstems.recipe import RecipeError
-from captainstems.registry import Manifest, Registry, RegistryError, load_curated
-from captainstems.server.jobs import JobManager
+from stemlab import __version__, audio, bootstrap, dsp, paths, runner
+from stemlab import recipe as recipe_module
+from stemlab.backends import base, device
+from stemlab.recipe import RecipeError
+from stemlab.registry import Manifest, Registry, RegistryError, load_curated
+from stemlab.server.jobs import JobManager
 
 UI_DIST = paths.REPO_ROOT / "app" / "dist"
 RECIPES_DIR = paths.REPO_ROOT / "recipes"
@@ -164,7 +164,7 @@ def create_app(
         yield
         jobs.shutdown()
 
-    app = FastAPI(title="CaptainStems", version=__version__, lifespan=lifespan)
+    app = FastAPI(title="Stemlab", version=__version__, lifespan=lifespan)
     # Local only: refuse requests addressed to any other host name (DNS rebinding)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts or LOCAL_HOSTS)
     app.add_middleware(
@@ -196,7 +196,7 @@ def create_app(
         info["version"] = __version__
         info["cache_bytes"] = runner.Cache().size()
         info["outputs_dir"] = str(paths.outputs_dir())
-        # What `captainstems bootstrap` would run for the chosen flavor, for the Doctor screen
+        # What `stemlab bootstrap` would run for the chosen flavor, for the Doctor screen
         try:
             info["bootstrap"] = {"commands": [" ".join(command) for command in bootstrap.plan(info["flavor"])]}
         except ValueError as e:
