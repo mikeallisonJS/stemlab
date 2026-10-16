@@ -184,9 +184,9 @@ server then serves it.
 The server listens on the local machine only and has no authentication. The desktop app (`app/src/main/`)
 spawns it on a free port, offers to run `bootstrap` on the first start and stops it on exit. `cd app && pnpm dist`
 builds the installer (NSIS, AppImage or dmg): the installed app creates its own Python environment with uv on
-the first start, so the installer stays small and one build serves every GPU. Pushing a `v*` tag builds all
+the first start, so the installer stays small and one build serves every GPU. A `v*` tag builds all
 three on GitHub Actions, signs the Windows build when the signing secrets are set, and publishes the
-auto-update feed the installed apps poll (`app/src/main/README.md`).
+auto-update feed the installed apps poll (`app/src/main/README.md`). Tags come from the release flow below.
 
 ## Development
 
@@ -199,6 +199,28 @@ cd app && pnpm test && pnpm typecheck
 
 `CLAUDE.md` has the rules of the codebase. MSST is a pinned submodule at `third_party/msst`; it is wrapped,
 never modified.
+
+## Releases
+
+Changeset-style, the same flow as Cadent: each PR declares its release intent as a fragment, a
+bot-maintained release PR aggregates them, merging that PR ships.
+
+1. A PR that touches `stemlab/`, the app, `recipes/`, `third_party/` or `pyproject.toml` adds one file
+   `changelog.d/<issue>.<type>.md` (or `+<slug>.<type>.md` without an issue). `changelog-check` fails the
+   PR without one. Types `breaking`, `feature` and `bugfix` render into `CHANGELOG.md` and decide the bump
+   (`breaking` is major, `feature` minor, `bugfix` patch); `chore` and `docs` never render and only ever
+   mean a patch. A `.devN` version releases as its base version whatever the fragments say. The body is
+   one or two sentences in a user-facing voice.
+2. Every push to `main` runs `release-pr.yml`: it computes the next version, writes it to
+   `pyproject.toml`, `stemlab/__init__.py`, `app/package.json` and `uv.lock`, renders the fragments into
+   `CHANGELOG.md` with towncrier, and keeps a `release/next` PR up to date with all of it.
+3. Merging the release PR is the release decision. `tag-release.yml` tags the merge commit `vX.Y.Z`,
+   drafts the GitHub Release with the changelog section as its body, and dispatches `release.yml` at the
+   tag, which builds and signs the installers, publishes the update feed to R2 and attaches the files to
+   the draft. Publishing the draft is the last human step.
+
+`uv run --with towncrier python scripts/release.py next-version` shows what the pending fragments add
+up to.
 
 ## Support
 
