@@ -1,6 +1,6 @@
-# Stemlab v2
+# Stemlab
 
-Power-user stem separation workbench. Python engine + CLI (`stemlab/`), FastAPI server (`stemlab/server/`), Electron+React UI (`app/`). v1 lives in `archive/v1/` and is dead; never import from it.
+Power-user stem separation workbench. Python engine + CLI (`stemlab/`), FastAPI server (`stemlab/server/`), Electron+React UI (`app/`). The unreleased PyQt predecessor lives in `archive/v1/` and is dead; never import from it. The first release is 1.0; the `v2` branch name is the rewrite's, not the version's.
 
 ## Commands
 - `uv sync --extra dev --extra server` — install

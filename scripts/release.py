@@ -12,9 +12,9 @@ changelog; chore/docs are the escape hatch: they satisfy the PR check, decide
 nothing above a patch bump, and never render.
 
 The version lives in three files that must agree: pyproject.toml and
-stemlab/__init__.py (PEP 440, `2.0.0.dev0`) and app/package.json (semver,
-`2.0.0-dev.0`). A pre-release (`.devN`) releases as its base version, whatever
-the fragments say: `2.0.0.dev0` plus anything is `2.0.0`.
+stemlab/__init__.py (PEP 440, `1.0.0.dev0`) and app/package.json (semver,
+`1.0.0-dev.0`). A pre-release (`.devN`) releases as its base version, whatever
+the fragments say: `1.0.0.dev0` plus anything is `1.0.0`.
 """
 
 from __future__ import annotations

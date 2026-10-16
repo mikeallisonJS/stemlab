@@ -35,36 +35,36 @@ class TestFragmentType:
 
 class TestNextVersion:
     def test_prerelease_releases_its_base_version(self):
-        assert release.next_version("2.0.0.dev0", {"feature"}) == "2.0.0"
-        assert release.next_version("2.0.0.dev3", {"breaking"}) == "2.0.0"
-        assert release.next_version("2.0.0.dev0", {"chore"}) == "2.0.0"
+        assert release.next_version("1.0.0.dev0", {"feature"}) == "1.0.0"
+        assert release.next_version("1.0.0.dev3", {"breaking"}) == "1.0.0"
+        assert release.next_version("1.0.0.dev0", {"chore"}) == "1.0.0"
 
     def test_bugfix_bumps_patch(self):
-        assert release.next_version("2.0.0", {"bugfix"}) == "2.0.1"
+        assert release.next_version("1.0.0", {"bugfix"}) == "1.0.1"
 
     def test_feature_bumps_minor_and_resets_patch(self):
-        assert release.next_version("2.0.3", {"feature", "bugfix"}) == "2.1.0"
+        assert release.next_version("1.0.3", {"feature", "bugfix"}) == "1.1.0"
 
     def test_breaking_bumps_major_from_one_point_oh(self):
-        assert release.next_version("2.1.3", {"breaking", "feature"}) == "3.0.0"
+        assert release.next_version("1.1.3", {"breaking", "feature"}) == "2.0.0"
 
     def test_breaking_rides_minor_while_zero_x(self):
         assert release.next_version("0.2.0", {"breaking"}) == "0.3.0"
 
     def test_hidden_types_still_bump_patch(self):
-        assert release.next_version("2.0.0", {"chore", "docs"}) == "2.0.1"
+        assert release.next_version("1.0.0", {"chore", "docs"}) == "1.0.1"
 
     def test_rejects_unknown_shapes(self):
         with pytest.raises(SystemExit):
-            release.next_version("2.0.0rc1", {"feature"})
+            release.next_version("1.0.0rc1", {"feature"})
 
 
 class TestNpmVersion:
     def test_release_is_spelled_the_same(self):
-        assert release.npm_version("2.0.0") == "2.0.0"
+        assert release.npm_version("1.0.0") == "1.0.0"
 
     def test_prerelease_uses_semver_suffix(self):
-        assert release.npm_version("2.0.0.dev0") == "2.0.0-dev.0"
+        assert release.npm_version("1.0.0.dev0") == "1.0.0-dev.0"
 
 
 class TestWriteVersion:
@@ -72,14 +72,14 @@ class TestWriteVersion:
     def tree(self, tmp_path, monkeypatch):
         pyproject = tmp_path / "pyproject.toml"
         pyproject.write_text(
-            '[project]\nname = "stemlab"\nversion = "2.0.0.dev0"\n[tool.other]\nrequires = ["x>=1"]\n',
+            '[project]\nname = "stemlab"\nversion = "1.0.0.dev0"\n[tool.other]\nrequires = ["x>=1"]\n',
             encoding="utf-8",
         )
         init = tmp_path / "__init__.py"
-        init.write_text('"""Stemlab."""\n\n__version__ = "2.0.0.dev0"\n', encoding="utf-8")
+        init.write_text('"""Stemlab."""\n\n__version__ = "1.0.0.dev0"\n', encoding="utf-8")
         package = tmp_path / "package.json"
         package.write_text(
-            '{\n  "name": "stemlab-app",\n  "version": "2.0.0-dev.0",\n  "devDependencies": {\n    "vite": "^7.0.0"\n  }\n}\n',
+            '{\n  "name": "stemlab-app",\n  "version": "1.0.0-dev.0",\n  "devDependencies": {\n    "vite": "^7.0.0"\n  }\n}\n',
             encoding="utf-8",
         )
         monkeypatch.setattr(release, "PYPROJECT", pyproject)
@@ -88,17 +88,17 @@ class TestWriteVersion:
         return tmp_path
 
     def test_writes_all_three_files(self, tree):
-        release.write_version("2.0.0")
-        assert 'version = "2.0.0"' in (tree / "pyproject.toml").read_text(encoding="utf-8")
-        assert '__version__ = "2.0.0"' in (tree / "__init__.py").read_text(encoding="utf-8")
+        release.write_version("1.0.0")
+        assert 'version = "1.0.0"' in (tree / "pyproject.toml").read_text(encoding="utf-8")
+        assert '__version__ = "1.0.0"' in (tree / "__init__.py").read_text(encoding="utf-8")
         package = json.loads((tree / "package.json").read_text(encoding="utf-8"))
-        assert package["version"] == "2.0.0"
+        assert package["version"] == "1.0.0"
         assert package["devDependencies"] == {"vite": "^7.0.0"}  # dependency versions untouched
 
     def test_refuses_ambiguous_version_lines(self, tree):
         (tree / "pyproject.toml").write_text('version = "1"\nversion = "2"\n', encoding="utf-8")
         with pytest.raises(SystemExit):
-            release.write_version("2.0.0")
+            release.write_version("1.0.0")
 
 
 class TestChangelogSection:
@@ -106,15 +106,15 @@ class TestChangelogSection:
         changelog = tmp_path / "CHANGELOG.md"
         changelog.write_text(
             "# Changelog\n\n<!-- towncrier release notes start -->\n\n"
-            "## v2.1.0 — 2026-11-01\n\n### Features\n\n- Newer thing\n\n\n"
-            "## v2.0.0 — 2026-10-20\n\n### Features\n\n- First thing\n",
+            "## v1.1.0 — 2026-11-01\n\n### Features\n\n- Newer thing\n\n\n"
+            "## v1.0.0 — 2026-10-20\n\n### Features\n\n- First thing\n",
             encoding="utf-8",
         )
         monkeypatch.setattr(release, "CHANGELOG", changelog)
-        assert release.changelog_section("2.0.0") == "### Features\n\n- First thing"
-        assert release.changelog_section("2.1.0") == "### Features\n\n- Newer thing"
+        assert release.changelog_section("1.0.0") == "### Features\n\n- First thing"
+        assert release.changelog_section("1.1.0") == "### Features\n\n- Newer thing"
         with pytest.raises(SystemExit):
-            release.changelog_section("1.0.0")
+            release.changelog_section("0.9.0")
 
 
 def test_repo_versions_agree():

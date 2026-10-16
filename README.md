@@ -4,8 +4,8 @@ A power-user stem separation workbench. Run any separation model you choose, inc
 add yourself, with every inference knob exposed. Compose separations as a graph (a *recipe*) of
 separate, subtract, ensemble, post-process, analyze and export steps, and rerun the same recipe on any file.
 
-This is version 2, a rewrite around a recipe engine. The original PyQt application is kept in
-[`archive/v1/`](archive/v1/). Plan and decisions:
+The first release is 1.0. The code is a rewrite around a recipe engine of an earlier PyQt application
+that was never released; it is kept in [`archive/v1/`](archive/v1/). Plan and decisions:
 [Stemlab v2 handoff](https://claude.ai/artifact/FoargYKnKDffjnQYnFNWzF).
 
 | Part | Where | What |
