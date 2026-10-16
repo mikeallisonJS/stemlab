@@ -3,9 +3,9 @@ import pytest
 import soundfile as sf
 from conftest import write_tone
 
-from captainstems import audio, dsp
-from captainstems.ops.ensemble import combine
-from captainstems.ops.export import safe_name
+from stemlab import audio, dsp
+from stemlab.ops.ensemble import combine
+from stemlab.ops.export import safe_name
 
 # Audio I/O ------------------------------------------------------------------------
 

@@ -1,7 +1,7 @@
 # Vocals with a UVR MDX-Net model (ONNX). Light enough for CPUs, and runs on
 # AMD and Intel GPUs through DirectML.
 #
-# Models: captainstems models fetch uvr-mdx-kim-vocal-2
+# Models: stemlab models fetch uvr-mdx-kim-vocal-2
 version: 1
 name: mdx-vocals
 

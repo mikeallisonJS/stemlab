@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import re
 
-from captainstems import audio
-from captainstems.ops import OpResult
-from captainstems.recipe import export_labels
+from stemlab import audio
+from stemlab.ops import OpResult
+from stemlab.recipe import export_labels
 
 _UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 

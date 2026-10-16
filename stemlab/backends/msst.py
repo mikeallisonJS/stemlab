@@ -18,8 +18,8 @@ from typing import Any
 
 import numpy as np
 
-from captainstems import paths
-from captainstems.backends.base import (
+from stemlab import paths
+from stemlab.backends.base import (
     COMMON_PARAMS,
     Backend,
     BackendError,
@@ -45,7 +45,7 @@ def _import_upstream():
         from utils.model_utils import _getWindowingArray, prefer_target_instrument
         from utils.settings import get_model_from_config
     except ImportError as e:
-        raise BackendError(f"MSST's dependencies are not installed ({e}). Run: captainstems bootstrap") from None
+        raise BackendError(f"MSST's dependencies are not installed ({e}). Run: stemlab bootstrap") from None
     return get_model_from_config, prefer_target_instrument, _getWindowingArray
 
 
@@ -319,7 +319,7 @@ class MsstBackend(Backend):
         return {"msst": commit, "torch": torch.__version__}
 
     def device_defaults(self, device: str, vram_mb: int | None) -> dict:
-        from captainstems.backends.device import device_defaults
+        from stemlab.backends.device import device_defaults
 
         defaults = device_defaults(device, vram_mb)
         return {key: defaults[key] for key in ("chunk_size", "overlap", "batch_size")}

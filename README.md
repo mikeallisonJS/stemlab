@@ -1,4 +1,4 @@
-# CaptainStems
+# Stemlab
 
 A power-user stem separation workbench. Run any separation model you choose, including checkpoints you
 add yourself, with every inference knob exposed. Compose separations as a graph (a *recipe*) of
@@ -6,12 +6,12 @@ separate, subtract, ensemble, post-process, analyze and export steps, and rerun 
 
 This is version 2, a rewrite around a recipe engine. The original PyQt application is kept in
 [`archive/v1/`](archive/v1/). Plan and decisions:
-[CaptainStems v2 handoff](https://claude.ai/artifact/FoargYKnKDffjnQYnFNWzF).
+[Stemlab v2 handoff](https://claude.ai/artifact/FoargYKnKDffjnQYnFNWzF).
 
 | Part | Where | What |
 | --- | --- | --- |
-| Engine and CLI | `captainstems/` | Recipes, runner, cache, model registry, backends |
-| API server | `captainstems/server/` | FastAPI and WebSocket, local only |
+| Engine and CLI | `stemlab/` | Recipes, runner, cache, model registry, backends |
+| API server | `stemlab/server/` | FastAPI and WebSocket, local only |
 | UI | `app/` | React: recipe graph, run queue, results |
 
 ## Setup
@@ -19,11 +19,11 @@ This is version 2, a rewrite around a recipe engine. The original PyQt applicati
 Requires [uv](https://docs.astral.sh/uv/), git, and for the UI [pnpm](https://pnpm.io/).
 
 ```
-git clone --recurse-submodules https://github.com/mikeallisonJS/CaptainStems
-cd CaptainStems
+git clone --recurse-submodules https://github.com/mikeallisonJS/Stemlab
+cd Stemlab
 uv sync --extra dev --extra server
-uv run captainstems bootstrap
-uv run captainstems doctor
+uv run stemlab bootstrap
+uv run stemlab doctor
 ```
 
 `bootstrap` installs the build of PyTorch that matches your GPU, the model libraries and one build of
@@ -48,8 +48,8 @@ Tested so far: Windows with an NVIDIA GPU, and Windows with a Radeon 8060S (Ryze
 ## Quick start
 
 ```
-uv run captainstems models fetch htdemucs
-uv run captainstems run recipes/four-stems.yaml song.flac
+uv run stemlab models fetch htdemucs
+uv run stemlab run recipes/four-stems.yaml song.flac
 ```
 
 The stems and a `run.json` land in `song [four-stems]/` next to the input. Use `--out` to choose the
@@ -94,32 +94,32 @@ nodes:
 can mean different things per backend (`overlap` is a count of chunks for MSST and a fraction for Demucs
 and ONNX); a default is applied to the nodes it fits.
 
-`captainstems validate recipe.yaml` checks a recipe against the installed models and prints every node's
-fully resolved parameters. `captainstems schema --backends` prints the JSON Schema of the format and of
+`stemlab validate recipe.yaml` checks a recipe against the installed models and prints every node's
+fully resolved parameters. `stemlab schema --backends` prints the JSON Schema of the format and of
 each backend's knobs. Examples are in [`recipes/`](recipes/), including the worked example from the handoff.
 
 ### Reproducibility
 
 Every run writes `run.json` beside its outputs: the recipe, the resolved parameters of each node, the
-SHA-256 of the input and of every model file, and the backend versions. `captainstems run run.json song.flac`
+SHA-256 of the input and of every model file, and the backend versions. `stemlab run run.json song.flac`
 repeats a run with exactly those parameters.
 
-Intermediate stems are cached under `~/.captainstems/cache`, keyed by a node's parameters, its model's
-hash and its inputs, so rerunning a recipe only recomputes what changed (`captainstems cache info|clear`).
+Intermediate stems are cached under `~/.stemlab/cache`, keyed by a node's parameters, its model's
+hash and its inputs, so rerunning a recipe only recomputes what changed (`stemlab cache info|clear`).
 A run that is cancelled or fails writes no output files.
 
 ## Models
 
-Models live in `~/.captainstems/models/`, one folder per model with a `manifest.json`, its config and its
-weights. Set `CAPTAINSTEMS_HOME` to move everything CaptainStems stores.
+Models live in `~/.stemlab/models/`, one folder per model with a `manifest.json`, its config and its
+weights. Set `STEMLAB_HOME` to move everything Stemlab stores.
 
 ```
-uv run captainstems models list
-uv run captainstems models fetch mel-band-roformer-deux scnet-xl-ihf
-uv run captainstems models verify
+uv run stemlab models list
+uv run stemlab models fetch mel-band-roformer-deux scnet-xl-ihf
+uv run stemlab models verify
 ```
 
-The curated list (`captainstems models list`) holds, as of October 2026: becruily's Mel-Band RoFormer Deux
+The curated list (`stemlab models list`) holds, as of October 2026: becruily's Mel-Band RoFormer Deux
 (vocals and instrumental in one pass, the best all-rounder), unwa's BS-RoFormer Resurrection (vocal and
 instrumental variants), Kim's and viperx's older vocal models, SCNet XL IHF and HT Demucs for 4 and 6 stems,
 and single-purpose models for dereverb, denoise and karaoke (lead against backing vocals). The
@@ -142,7 +142,7 @@ part of this repository and carry their own licenses, shown in `models list --js
 ### Adding your own model
 
 ```
-uv run captainstems models add my-vocals --backend msst --arch mel_band_roformer \
+uv run stemlab models add my-vocals --backend msst --arch mel_band_roformer \
     --config path/to/config.yaml --weights path/to/model.ckpt --stems vocals -d overlap=4
 ```
 
@@ -157,7 +157,7 @@ source, add `--unsafe-pickle`.
 ## UI
 
 ```
-uv run captainstems serve          # API on http://127.0.0.1:8787
+uv run stemlab serve          # API on http://127.0.0.1:8787
 cd app && pnpm i && pnpm dev       # UI with hot reload on http://localhost:5173
 ```
 
@@ -199,6 +199,11 @@ cd app && pnpm test && pnpm typecheck
 
 `CLAUDE.md` has the rules of the codebase. MSST is a pinned submodule at `third_party/msst`; it is wrapped,
 never modified.
+
+## Support
+
+Stemlab is free and MIT licensed. If it saves you time, you can support the work on
+[GitHub Sponsors](https://github.com/sponsors/mikeallisonJS) or [donate directly](https://captainssounds.com/donate).
 
 ## License
 

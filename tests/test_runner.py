@@ -6,9 +6,9 @@ import pytest
 import soundfile as sf
 from conftest import add_fake_model, write_tone
 
-from captainstems import audio, recipe, runner
-from captainstems.backends.base import Cancelled
-from captainstems.recipe import RecipeError
+from stemlab import audio, recipe, runner
+from stemlab.backends.base import Cancelled
+from stemlab.recipe import RecipeError
 
 SEPARATE_EXPORT = """
 name: two-node
@@ -317,7 +317,7 @@ def test_cache_follows_what_affects_the_result(clip, tmp_path, registry, fake_ba
 
 
 def test_changed_weights_invalidate_the_cache(clip, tmp_path, registry, fake_backend):
-    from captainstems.registry import Registry
+    from stemlab.registry import Registry
 
     run(SEPARATE_EXPORT, clip, tmp_path, registry)
     folder = registry.get("two-stem").folder
@@ -439,8 +439,8 @@ def test_a_default_is_skipped_where_it_does_not_fit_but_must_fit_somewhere(clip,
     """`overlap` is a chunk count for one backend and a fraction for another."""
     from conftest import FakeBackend
 
-    from captainstems.backends import base
-    from captainstems.backends.base import ParamSpec
+    from stemlab.backends import base
+    from stemlab.backends.base import ParamSpec
 
     fractional = FakeBackend()
     fractional.name = "demucs"

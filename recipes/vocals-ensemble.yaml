@@ -2,7 +2,7 @@
 # averaged. Each model's mistakes are its own, so the average keeps what they
 # agree on. The instrumental is the mix minus that, sample-exact.
 #
-# Models: captainstems models fetch mel-band-roformer-deux bs-roformer-resurrection mel-band-roformer-vocals-kim
+# Models: stemlab models fetch mel-band-roformer-deux bs-roformer-resurrection mel-band-roformer-vocals-kim
 version: 1
 name: vocals-ensemble
 defaults:

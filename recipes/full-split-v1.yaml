@@ -2,7 +2,7 @@
 # instrumental, a 6 stem split of the instrumental with ensembled drums,
 # dereverbed vocals, FLAC out.
 #
-# Models: captainstems models fetch mel-band-roformer-vocals-kim htdemucs_6s scnet-large dereverb-mel-roformer
+# Models: stemlab models fetch mel-band-roformer-vocals-kim htdemucs_6s scnet-large dereverb-mel-roformer
 version: 1
 name: full-split-v1
 defaults:            # applied to every separate/postprocess node unless overridden

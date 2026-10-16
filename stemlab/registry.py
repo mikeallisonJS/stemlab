@@ -1,5 +1,5 @@
 """
-The model registry: one folder per model below `~/.captainstems/models/`,
+The model registry: one folder per model below `~/.stemlab/models/`,
 each holding a `manifest.json`, the model's config and its weights.
 
 The folder name is the id used in recipes. Custom models are added by
@@ -23,7 +23,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from captainstems import audio, paths
+from stemlab import audio, paths
 
 MANIFEST = "manifest.json"
 VERIFIED = ".verified.json"
@@ -203,7 +203,7 @@ def _download(
     """Download to `target` through a .part file, verifying the checksum before it is kept."""
     partial = target.with_name(target.name + ".part")
     digest = hashlib.sha256()
-    request = urllib.request.Request(url, headers={"User-Agent": "captainstems"})
+    request = urllib.request.Request(url, headers={"User-Agent": "stemlab"})
     try:
         with urllib.request.urlopen(request, timeout=60) as response, open(partial, "wb") as f:
             total = int(response.headers.get("Content-Length") or 0) or None
@@ -268,7 +268,7 @@ class Registry:
             raise RegistryError(f"Model '{model_id}' has a broken manifest: {self.problems[model_id]}")
         hint = ""
         if model_id in load_curated():
-            hint = f" It is a curated model: run `captainstems models fetch {model_id}`."
+            hint = f" It is a curated model: run `stemlab models fetch {model_id}`."
         raise RegistryError(f"Model '{model_id}' is not installed.{hint}")
 
     def fetch(

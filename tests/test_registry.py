@@ -5,9 +5,9 @@ import pytest
 from conftest import add_fake_model
 from typer.testing import CliRunner
 
-from captainstems import registry as registry_module
-from captainstems.cli import app
-from captainstems.registry import Manifest, Registry, RegistryError
+from stemlab import registry as registry_module
+from stemlab.cli import app
+from stemlab.registry import Manifest, Registry, RegistryError
 
 runner = CliRunner()
 

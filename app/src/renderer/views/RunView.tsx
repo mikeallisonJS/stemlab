@@ -120,7 +120,7 @@ export function RunView({ recipe, validation, jobs, logs, inputs, setInputs, onJ
             setDragging(false);
             if (!e.dataTransfer.files.length) return;
             // In the desktop app the server reads dropped files where they are; a browser can only send their bytes
-            const shell = window.captainstems;
+            const shell = window.stemlab;
             if (shell) addPaths(Array.from(e.dataTransfer.files).map(shell.pathForFile));
             else upload(e.dataTransfer.files);
           }}>

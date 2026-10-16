@@ -11,7 +11,7 @@ import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
 
-from captainstems import paths
+from stemlab import paths
 
 FLAVORS = ("cuda", "rocm", "mps", "cpu")
 
@@ -293,8 +293,8 @@ class SystemInfo:
 
 
 def system_info() -> SystemInfo:
-    from captainstems import audio
-    from captainstems.backends import base
+    from stemlab import audio
+    from stemlab.backends import base
 
     detected, gpu, memory = detect_gpu()
     flavor, source = chosen_flavor()

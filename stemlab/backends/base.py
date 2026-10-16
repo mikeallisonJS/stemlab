@@ -128,7 +128,7 @@ class Backend(ABC):
 
     def resolve_device(self, requested: str) -> str:
         """Turn a device request ("auto" included) into one this backend can use right now."""
-        from captainstems.backends import device
+        from stemlab.backends import device
 
         return device.resolve_device(requested)
 
@@ -157,7 +157,7 @@ def get_backend(name: str) -> Backend:
     if name not in BACKENDS:
         raise BackendError(f"Unknown backend '{name}' (use one of {', '.join(BACKENDS)})")
     if name not in _instances:
-        module = importlib.import_module(f"captainstems.backends.{name}")
+        module = importlib.import_module(f"stemlab.backends.{name}")
         _instances[name] = module.create()
     return _instances[name]
 

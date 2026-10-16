@@ -28,10 +28,10 @@ class AudioError(Exception):
 
 def find_ffmpeg() -> str | None:
     """
-    Locate FFmpeg: CAPTAINSTEMS_FFMPEG (set by the packaged app, which ships its
+    Locate FFmpeg: STEMLAB_FFMPEG (set by the packaged app, which ships its
     own binary), then the PATH, then the imageio-ffmpeg package if present.
     """
-    override = os.environ.get("CAPTAINSTEMS_FFMPEG")
+    override = os.environ.get("STEMLAB_FFMPEG")
     if override and Path(override).is_file():
         return override
     found = shutil.which("ffmpeg")
@@ -50,7 +50,7 @@ def _require_ffmpeg() -> str:
     if not ffmpeg:
         raise AudioError(
             "FFmpeg is needed for this file format but was not found. "
-            "Install it or set CAPTAINSTEMS_FFMPEG to its path."
+            "Install it or set STEMLAB_FFMPEG to its path."
         )
     return ffmpeg
 
@@ -84,7 +84,7 @@ def load(
         data, rate = sf.read(str(path), dtype="float32", always_2d=True)
     except Exception:
         # Not a libsndfile format: let FFmpeg decode it to float WAV first
-        with tempfile.TemporaryDirectory(prefix="captainstems_") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stemlab_") as tmp:
             decoded = Path(tmp) / "decoded.wav"
             _ffmpeg(
                 ["-i", str(path), "-vn", "-map", "0:a:0", "-c:a", "pcm_f32le", str(decoded)],
@@ -183,7 +183,7 @@ def write(
         subtype = "PCM_16" if bit_depth == 16 else "PCM_24"
         sf.write(str(path), np.clip(frames, -1.0, 1.0), sample_rate, subtype=subtype, format="FLAC")
     else:
-        with tempfile.TemporaryDirectory(prefix="captainstems_") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stemlab_") as tmp:
             source = Path(tmp) / "source.wav"
             sf.write(str(source), np.clip(frames, -1.0, 1.0), sample_rate, subtype="PCM_24", format="WAV")
             _ffmpeg(

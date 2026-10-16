@@ -11,12 +11,12 @@ import type {
   Validation,
 } from "./types";
 
-// Served by `captainstems serve` the API shares our origin; under Vite's dev
+// Served by `stemlab serve` the API shares our origin; under Vite's dev
 // server (or with VITE_API set) it lives on its own port. The desktop app
 // starts the server itself and says where.
 const DEV_API = "http://127.0.0.1:8787";
 export const API: string =
-  window.captainstems?.api ??
+  window.stemlab?.api ??
   (import.meta.env.VITE_API as string | undefined) ??
   (import.meta.env.DEV ? DEV_API : window.location.origin);
 
@@ -33,7 +33,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     response = await fetch(API + path, init);
   } catch {
-    throw new ApiError(0, `Cannot reach the CaptainStems server at ${API}. Start it with: captainstems serve`);
+    throw new ApiError(0, `Cannot reach the Stemlab server at ${API}. Start it with: stemlab serve`);
   }
   if (!response.ok) {
     let message = response.statusText;

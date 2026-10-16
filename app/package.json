@@ -1,8 +1,8 @@
 {
-  "name": "captainstems-app",
+  "name": "stemlab-app",
   "private": true,
   "version": "2.0.0-dev.0",
-  "description": "CaptainStems UI: recipe editor, run queue and results",
+  "description": "Stemlab UI: recipe editor, run queue and results",
   "main": "dist-electron/main.cjs",
   "type": "module",
   "scripts": {

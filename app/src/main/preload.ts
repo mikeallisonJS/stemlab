@@ -3,7 +3,7 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 
 const argument = (name: string) => {
-  const prefix = `--captainstems-${name}=`;
+  const prefix = `--stemlab-${name}=`;
   const found = process.argv.find((arg) => arg.startsWith(prefix));
   return found ? found.slice(prefix.length) : undefined;
 };
@@ -38,4 +38,4 @@ const shell = {
 
 export type Shell = typeof shell;
 
-contextBridge.exposeInMainWorld("captainstems", shell);
+contextBridge.exposeInMainWorld("stemlab", shell);

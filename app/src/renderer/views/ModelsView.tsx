@@ -18,7 +18,7 @@ const EMPTY = { id: "", backend: "msst", arch: "", config: "", weights: "", stem
 const FLAVORS = ["cuda", "rocm", "mps", "cpu"];
 
 /** Desktop app only: its version and a manual update check (checks also run on their own). */
-function Updates({ shell }: { shell: CaptainStemsShell }) {
+function Updates({ shell }: { shell: StemlabShell }) {
   const [result, setResult] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const check = async () => {
@@ -47,7 +47,7 @@ function Doctor({ system, onChanged }: { system: SystemInfo; onChanged: () => vo
   const [target, setTarget] = useState(system.rocm_target ?? "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const shell = window.captainstems;
+  const shell = window.stemlab;
   const windows = system.os === "Windows";
   const changed = flavor !== (system.flavor_source === "override" ? system.flavor : "auto") || (target || "") !== (system.rocm_target ?? "");
   const installed = Boolean(system.torch.version);
@@ -91,7 +91,7 @@ function Doctor({ system, onChanged }: { system: SystemInfo; onChanged: () => vo
           {shell ? (
             <div><button className="small primary" onClick={() => shell.bootstrap()}>Install the model libraries</button></div>
           ) : (
-            <div>Run <code>captainstems bootstrap</code>, which does:<pre>{system.bootstrap?.commands?.join("\n")}</pre></div>
+            <div>Run <code>stemlab bootstrap</code>, which does:<pre>{system.bootstrap?.commands?.join("\n")}</pre></div>
           )}
         </div>
       )}
@@ -177,7 +177,7 @@ export function ModelsView({ system, models, onChanged }: Props) {
             <tbody>
               <tr><th>GPU</th><td>{system.gpu ? `${system.gpu}${system.vram_mb ? ` (${Math.round(system.vram_mb / 1024)} GB)` : ""}` : "none detected"}</td></tr>
               <tr><th>Torch flavor</th><td>{system.flavor}{system.flavor_source === "override" ? ` (override; detected ${system.detected_flavor})` : ""}{system.rocm_target ? ` · ${system.rocm_target}` : ""}</td></tr>
-              <tr><th>torch</th><td>{system.torch.version ? `${system.torch.version} · ${system.torch.cuda ? (system.torch.hip ? "ROCm" : "CUDA") : system.torch.mps ? "MPS" : "CPU only"}` : "not installed: run captainstems bootstrap"}</td></tr>
+              <tr><th>torch</th><td>{system.torch.version ? `${system.torch.version} · ${system.torch.cuda ? (system.torch.hip ? "ROCm" : "CUDA") : system.torch.mps ? "MPS" : "CPU only"}` : "not installed: run stemlab bootstrap"}</td></tr>
               <tr><th>onnxruntime</th><td>{system.onnxruntime.version ? `${system.onnxruntime.version} · ${system.onnxruntime.providers.map((p) => p.replace("ExecutionProvider", "")).join(", ")}` : "not installed"}</td></tr>
               <tr><th>FFmpeg</th><td>{system.ffmpeg ?? "not found"}</td></tr>
               {Object.entries(system.backends).map(([name, versions]) => (
@@ -188,7 +188,7 @@ export function ModelsView({ system, models, onChanged }: Props) {
           </table>
         ) : <p className="muted">Loading...</p>}
         {system && <Doctor key={`${system.flavor}:${system.flavor_source}:${system.rocm_target ?? ""}`} system={system} onChanged={onChanged} />}
-        {window.captainstems && <Updates shell={window.captainstems} />}
+        {window.stemlab && <Updates shell={window.stemlab} />}
       </section>
 
       <section>
