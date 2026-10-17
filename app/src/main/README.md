@@ -12,11 +12,14 @@ when the window closes.
 
 With `pnpm dev` running, the shell loads the Vite dev server instead of the
 built UI, so renderer changes hot-reload. `preload.ts` hands the renderer the
-API URL, the real path of dropped files and a `bootstrap()` call
-(`window.stemlab`): the Doctor part of the Models view uses it after a
-flavor change to reinstall the model libraries, which the shell runs with the
-loading screen showing, then restarts the server on the same port and reloads
-the UI.
+API URL, the real path of dropped files, a `storage` to use instead of
+`localStorage` and a `bootstrap()` call (`window.stemlab`). The page's origin
+includes the server's port, which is new on every launch, so web storage would
+start empty each time; `storage` keeps the open recipe in `ui-state.json` in
+the user data folder instead. The Doctor part of the Models view uses
+`bootstrap()` after a flavor change to reinstall the model libraries, which
+the shell runs with the loading screen showing, then restarts the server on
+the same port and reloads the UI.
 
 ## The packaged app
 

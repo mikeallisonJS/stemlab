@@ -21,6 +21,14 @@ const shell = {
   version: argument("version"),
   /** The path of a dropped File, so the server reads it in place instead of receiving its bytes. */
   pathForFile: (file: File): string => webUtils.getPathForFile(file),
+  /**
+   * In place of localStorage, whose origin includes the server's port and so is
+   * new on every launch: a file in the user data folder, kept by the main process.
+   */
+  storage: {
+    getItem: (key: string): string | null => ipcRenderer.sendSync("storage:get", key),
+    setItem: (key: string, value: string): void => ipcRenderer.send("storage:set", key, value),
+  },
   // Loading screen <-> main process
   onLog: (callback: (line: string) => void) => {
     ipcRenderer.on("log", (_event, line: string) => callback(line));

@@ -225,22 +225,24 @@ async function startServer(python: Python, port?: number): Promise<string> {
   port = port ?? (await freePort());
   const url = `http://127.0.0.1:${port}`;
   logLine(`$ ${python.describe} serve --port ${port}`);
-  server = spawn(python.command, [...python.args, "serve", "--port", String(port)], {
+  const child = spawn(python.command, [...python.args, "serve", "--port", String(port)], {
     cwd: python.root,
     env: pythonEnv(python),
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
-  pipe(server);
+  server = child;
+  pipe(child);
   let exited: string | null = null;
-  server.on("exit", (code, signal) => {
+  child.on("exit", (code, signal) => {
     exited = `The server stopped (${signal ?? `exit code ${code}`}).`;
-    if (main && !main.isDestroyed()) {
+    // Only a server that dies on its own is an error, not one stopServer() ended (on quit, or to restart it)
+    if (server === child && main && !main.isDestroyed()) {
       dialog.showErrorBox("Stemlab", `${exited}\n\n${log.slice(-15).join("\n")}`);
       app.quit();
     }
   });
-  server.on("error", (error) => {
+  child.on("error", (error) => {
     exited = `The server could not be started: ${error.message}`;
   });
 
@@ -412,6 +414,65 @@ function setupUpdates(): void {
 
 ipcMain.handle("update:check", () => checkForUpdates());
 
+// UI state --------------------------------------------------------------------
+//
+// What the renderer would otherwise keep in localStorage (the open recipe).
+// Web storage belongs to the page's origin, and the origin includes the
+// server's port, which is new on every launch, so it would start empty each
+// time. Instead: a JSON file in the user data folder, read once, written a
+// moment after the last change and on quit. A failed write leaves the state
+// unsaved, so the next change or the quit tries again.
+
+const STORAGE_WRITE_DELAY = 500;
+let storage: Map<string, string> | null = null;
+let storageTimer: NodeJS.Timeout | null = null;
+let storageUnsaved = false;
+
+function storageFile(): string {
+  return path.join(app.getPath("userData"), "ui-state.json");
+}
+
+function loadStorage(): Map<string, string> {
+  if (storage) return storage;
+  storage = new Map();
+  try {
+    const parsed = JSON.parse(fs.readFileSync(storageFile(), "utf8"));
+    for (const [key, value] of Object.entries(parsed ?? {})) {
+      if (typeof value === "string") storage.set(key, value);
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") logLine(`UI state not read: ${(error as Error).message}`);
+  }
+  return storage;
+}
+
+function flushStorage(): void {
+  if (storageTimer) clearTimeout(storageTimer);
+  storageTimer = null;
+  if (!storageUnsaved || !storage) return;
+  // Write a sibling and rename it over the file, so a crash mid-write keeps the old state
+  const file = storageFile();
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file + ".tmp", JSON.stringify(Object.fromEntries(storage)));
+    fs.renameSync(file + ".tmp", file);
+    storageUnsaved = false;
+  } catch (error) {
+    logLine(`UI state not saved: ${(error as Error).message}`);
+  }
+}
+
+ipcMain.on("storage:get", (event, key: string) => {
+  event.returnValue = loadStorage().get(String(key)) ?? null;
+});
+
+ipcMain.on("storage:set", (_event, key: string, value: string) => {
+  loadStorage().set(String(key), String(value));
+  storageUnsaved = true;
+  if (storageTimer) clearTimeout(storageTimer);
+  storageTimer = setTimeout(flushStorage, STORAGE_WRITE_DELAY);
+});
+
 // Startup ---------------------------------------------------------------------
 
 async function start(): Promise<void> {
@@ -549,8 +610,12 @@ if (!app.requestSingleInstanceLock()) {
       win.focus();
     }
   });
-  app.on("before-quit", stopServer);
-  app.on("will-quit", stopServer);
+  const shutdown = () => {
+    flushStorage();
+    stopServer();
+  };
+  app.on("before-quit", shutdown);
+  app.on("will-quit", shutdown);
   app.on("window-all-closed", () => app.quit());
   process.on("exit", stopServer);
   void app.whenReady().then(() =>
