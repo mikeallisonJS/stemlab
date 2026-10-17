@@ -51,8 +51,9 @@ function windowsSigning() {
 // Auto-update: the app checks this folder for latest.yml (latest-linux.yml,
 // latest-mac.yml) and downloads the installer named there. The release
 // workflow uploads them to Cloudflare R2 behind this host, the same bucket
-// and secrets as Cadent. The repository is private, so GitHub releases
-// cannot serve the feed (that would need a token inside the app).
+// and secrets as Cadent. GitHub release assets would redirect to expiring
+// links, which electron-updater copes with but the Microsoft Store does not,
+// and the Store takes the same installer from the same host.
 const UPDATE_URL = process.env.STEMLAB_UPDATE_URL || "https://downloads.mikeallisonjs.com/stemlab";
 
 module.exports = {
