@@ -412,6 +412,61 @@ function setupUpdates(): void {
 
 ipcMain.handle("update:check", () => checkForUpdates());
 
+// UI state --------------------------------------------------------------------
+//
+// What the renderer would otherwise keep in localStorage (the open recipe).
+// Web storage belongs to the page's origin, and the origin includes the
+// server's port, which is new on every launch, so it would start empty each
+// time. Instead: a JSON file in the user data folder, read once, written a
+// moment after the last change and on quit.
+
+const STORAGE_WRITE_DELAY = 500;
+let storage: Map<string, string> | null = null;
+let storageTimer: NodeJS.Timeout | null = null;
+
+function storageFile(): string {
+  return path.join(app.getPath("userData"), "ui-state.json");
+}
+
+function loadStorage(): Map<string, string> {
+  if (storage) return storage;
+  storage = new Map();
+  try {
+    const parsed = JSON.parse(fs.readFileSync(storageFile(), "utf8"));
+    for (const [key, value] of Object.entries(parsed ?? {})) {
+      if (typeof value === "string") storage.set(key, value);
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") logLine(`UI state not read: ${(error as Error).message}`);
+  }
+  return storage;
+}
+
+function flushStorage(): void {
+  if (!storageTimer || !storage) return;
+  clearTimeout(storageTimer);
+  storageTimer = null;
+  // Write a sibling and rename it over the file, so a crash mid-write keeps the old state
+  const file = storageFile();
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file + ".tmp", JSON.stringify(Object.fromEntries(storage)));
+    fs.renameSync(file + ".tmp", file);
+  } catch (error) {
+    logLine(`UI state not saved: ${(error as Error).message}`);
+  }
+}
+
+ipcMain.on("storage:get", (event, key: string) => {
+  event.returnValue = loadStorage().get(String(key)) ?? null;
+});
+
+ipcMain.on("storage:set", (_event, key: string, value: string) => {
+  loadStorage().set(String(key), String(value));
+  if (storageTimer) clearTimeout(storageTimer);
+  storageTimer = setTimeout(flushStorage, STORAGE_WRITE_DELAY);
+});
+
 // Startup ---------------------------------------------------------------------
 
 async function start(): Promise<void> {
@@ -550,7 +605,10 @@ if (!app.requestSingleInstanceLock()) {
     }
   });
   app.on("before-quit", stopServer);
-  app.on("will-quit", stopServer);
+  app.on("will-quit", () => {
+    flushStorage();
+    stopServer();
+  });
   app.on("window-all-closed", () => app.quit());
   process.on("exit", stopServer);
   void app.whenReady().then(() =>

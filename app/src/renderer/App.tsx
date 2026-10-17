@@ -12,9 +12,12 @@ type Tab = "recipe" | "run" | "results" | "models";
 const STORED_RECIPE = "stemlab.recipe";
 const BLANK: RecipeData = { name: "new-recipe", nodes: {} };
 
+/** The desktop shell's storage outlives the page's origin, which changes with the server's port */
+const storage = (): Pick<Storage, "getItem" | "setItem"> => window.stemlab?.storage ?? localStorage;
+
 function storedRecipe(): RecipeData | null {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORED_RECIPE) ?? "null");
+    const parsed = JSON.parse(storage().getItem(STORED_RECIPE) ?? "null");
     return parsed && typeof parsed === "object" && parsed.nodes ? (parsed as RecipeData) : null;
   } catch {
     return null;
@@ -63,7 +66,7 @@ export function App() {
   const setRecipe = useCallback((next: RecipeData) => {
     setRecipeState(next);
     try {
-      localStorage.setItem(STORED_RECIPE, JSON.stringify(next));
+      storage().setItem(STORED_RECIPE, JSON.stringify(next));
     } catch {
       // storage full or unavailable: the recipe just is not remembered
     }
