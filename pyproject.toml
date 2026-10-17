@@ -1,6 +1,6 @@
 [project]
 name = "stemlab"
-version = "2.0.0.dev0"
+version = "1.0.0.dev0"
 description = "Power-user stem separation workbench: recipe engine, CLI, local API and UI"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -58,3 +58,26 @@ ignore = ["B008"]  # typer and FastAPI declare options as argument defaults
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E501"]
+
+[tool.towncrier]
+directory = "changelog.d"
+filename = "CHANGELOG.md"
+title_format = "## v{version} — {project_date}"
+issue_format = "[#{issue}](https://github.com/mikeallisonJS/Stemlab/issues/{issue})"
+ignore = ["README.md"]
+underlines = ["", "", ""]
+
+[[tool.towncrier.type]]
+directory = "breaking"
+name = "Breaking changes"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "feature"
+name = "Features"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "bugfix"
+name = "Fixes"
+showcontent = true

@@ -1,6 +1,6 @@
-# Stemlab v2
+# Stemlab
 
-Power-user stem separation workbench. Python engine + CLI (`stemlab/`), FastAPI server (`stemlab/server/`), Electron+React UI (`app/`). v1 lives in `archive/v1/` and is dead; never import from it.
+Power-user stem separation workbench. Python engine + CLI (`stemlab/`), FastAPI server (`stemlab/server/`), Electron+React UI (`app/`). The unreleased PyQt predecessor lives in `archive/v1/` and is dead; never import from it. The first release is 1.0; the `v2` branch name is the rewrite's, not the version's.
 
 ## Commands
 - `uv sync --extra dev --extra server` — install
@@ -20,4 +20,5 @@ Power-user stem separation workbench. Python engine + CLI (`stemlab/`), FastAPI 
 - Torch is never a declared dependency of the package; the bootstrap installs the right flavor. Tests must pass on CPU.
 - MSST is a pinned submodule at `third_party/msst`; wrap, don't modify.
 - Every run writes `run.json` with resolved params and model sha256s. If a result can't be reproduced from `run.json`, that's a bug.
+- A PR that touches code adds a changelog fragment, `changelog.d/<issue>.<type>.md` or `+<slug>.<type>.md` (README: Releases). Releases are cut by merging the bot's `release/next` PR; never bump versions or push `v*` tags by hand.
 - Plan and decisions: see the handoff doc (link in README).

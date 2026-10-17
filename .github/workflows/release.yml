@@ -1,7 +1,10 @@
 name: Release
 
-# Builds the desktop app for each platform when a version tag is pushed and
-# attaches the installers to a draft GitHub release.
+# Builds the desktop app for each platform at a version tag and attaches the
+# installers to the draft GitHub release for that tag. tag-release.yml creates
+# the tag and the draft when a release PR merges, then dispatches this workflow
+# at the tag (a GITHUB_TOKEN-pushed tag never fires `on: push: tags`). A tag
+# pushed by hand still works: the release job drafts the release itself.
 #
 # Windows signing is optional and secret-gated, the same shape and the same
 # six secrets as Cadent's build-installer workflow, so one Azure Artifact
@@ -23,8 +26,9 @@ name: Release
 # the short-lived certificate. macOS builds are unsigned for now.
 #
 # Tag builds also publish the auto-update feed - the installers, their
-# blockmaps and latest*.yml - to Cloudflare R2, gated the same way on the five
-# secrets Cadent's workflow uses for the same bucket. The installed app checks
+# blockmaps and latest*.yml - to Cloudflare R2 with the five secrets Cadent's
+# workflow uses for the same bucket. A tag build without them fails: a release
+# is not a release until installed apps can find it. The installed app checks
 # https://<R2_PUBLIC_HOST>/stemlab/ (app/electron-builder.cjs), which
 # must be a custom domain on the bucket: Cloudflare rate-limits r2.dev.
 #
@@ -162,17 +166,15 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           R2_PUBLIC_HOST: ${{ secrets.R2_PUBLIC_HOST }}
         run: |
-          # Same three-state gate as signing: none skips, partial fails, all five publish.
+          # A tag build is a release, and a release ships its update feed: unlike
+          # signing, missing R2 secrets fail here rather than skip, so a merged
+          # release PR cannot quietly leave installed apps without an update.
           present=0
           for value in "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" "$R2_ACCOUNT_ID" "$R2_BUCKET" "$R2_PUBLIC_HOST"; do
             [ -n "$value" ] && present=$((present + 1))
           done
-          if [ "$present" -eq 0 ]; then
-            echo "No R2 secrets - the release has the installers, but installed apps will find no update feed."
-            exit 0
-          fi
           if [ "$present" -ne 5 ]; then
-            echo "::error::Publishing the update feed needs all five R2_* secrets - $((5 - present)) of them are unset."
+            echo "::error::Publishing the update feed needs all five R2_* secrets - $((5 - present)) of them are unset. Set them with: gh secret set R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET R2_PUBLIC_HOST"
             exit 1
           fi
           endpoint="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
@@ -210,8 +212,13 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: artifacts/*
-          draft: true
-          generate_release_notes: true
+      - name: Attach the installers to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # tag-release.yml drafted the release with the curated notes; a hand-pushed tag has none yet
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --title "$TAG" --generate-notes
+          fi
+          gh release upload "$TAG" artifacts/* --repo "$GITHUB_REPOSITORY" --clobber
