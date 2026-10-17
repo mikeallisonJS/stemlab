@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2a3042"/>
+      <stop offset="1" stop-color="#101320"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.55">
+      <stop offset="0" stop-color="#4aa3ff" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#4aa3ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="232" fill="url(#tile)"/>
+  <rect width="1024" height="1024" rx="232" fill="url(#glow)"/>
+  <g transform="translate(0 0) scale(1)">
+    <path d="M416 512 C 520 512, 512 272, 616 272 L 848 272" stroke="#4aa3ff" stroke-width="72" stroke-linecap="round" fill="none"/>
+    <path d="M416 512 C 520 512, 512 432, 616 432 L 848 432" stroke="#f5a524" stroke-width="72" stroke-linecap="round" fill="none"/>
+    <path d="M416 512 C 520 512, 512 592, 616 592 L 848 592" stroke="#c084fc" stroke-width="72" stroke-linecap="round" fill="none"/>
+    <path d="M416 512 C 520 512, 512 752, 616 752 L 848 752" stroke="#3fb97c" stroke-width="72" stroke-linecap="round" fill="none"/>
+    <path d="M176 512 L 416 512" stroke="#e4e7ee" stroke-width="88" stroke-linecap="round" fill="none"/>
+  </g>
+</svg>

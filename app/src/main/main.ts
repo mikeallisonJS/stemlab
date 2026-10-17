@@ -56,6 +56,13 @@ function status(message: string): void {
   setState({ phase: "starting", message, actions: [] });
 }
 
+// The window icon. Windows and macOS take the packaged app's icon for the
+// taskbar and dock anyway; this is for Linux and for running from a checkout.
+const WINDOW_ICON = (() => {
+  const file = path.join(app.getAppPath(), "assets", "icon.png");
+  return fs.existsSync(file) ? file : undefined;
+})();
+
 function showLoading(): BrowserWindow {
   const win = new BrowserWindow({
     width: 640,
@@ -63,6 +70,7 @@ function showLoading(): BrowserWindow {
     resizable: false,
     autoHideMenuBar: true,
     title: "Stemlab",
+    icon: WINDOW_ICON,
     backgroundColor: "#16181d",
     webPreferences: { preload: PRELOAD, contextIsolation: true, sandbox: true },
   });
@@ -306,6 +314,7 @@ function showMain(url: string, api: string): BrowserWindow {
     minHeight: 600,
     autoHideMenuBar: true,
     title: "Stemlab",
+    icon: WINDOW_ICON,
     backgroundColor: "#16181d",
     show: false,
     webPreferences: {

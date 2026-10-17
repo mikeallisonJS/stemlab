@@ -51,15 +51,19 @@ function windowsSigning() {
 // Auto-update: the app checks this folder for latest.yml (latest-linux.yml,
 // latest-mac.yml) and downloads the installer named there. The release
 // workflow uploads them to Cloudflare R2 behind this host, the same bucket
-// and secrets as Cadent. The repository is private, so GitHub releases
-// cannot serve the feed (that would need a token inside the app).
+// and secrets as Cadent. GitHub release assets would redirect to expiring
+// links, which electron-updater copes with but the Microsoft Store does not,
+// and the Store takes the same installer from the same host.
 const UPDATE_URL = process.env.STEMLAB_UPDATE_URL || "https://downloads.mikeallisonjs.com/stemlab";
 
 module.exports = {
   appId: "dev.stemlab.app",
   productName: "Stemlab",
-  directories: { output: "release", buildResources: "build/resources" },
-  files: ["dist-electron/**", "package.json"],
+  // assets/ rather than the default build/: build/ is gitignored (the engine is
+  // assembled there), and the icon is a source. assets/icon.png is rendered by
+  // scripts/build-icons.mjs; electron-builder derives the .ico and .icns from it.
+  directories: { output: "release", buildResources: "assets" },
+  files: ["dist-electron/**", "assets/icon.png", "package.json"],
   // The engine: the wheel, recipes, MSST, the built UI and FFmpeg (scripts/prepare-engine.mjs)
   extraResources: [{ from: "build/engine", to: "engine" }],
   asar: true,
