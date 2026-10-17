@@ -415,9 +415,8 @@ for f in docs/store/box-art-2160.png docs/store/poster-art-1440x2160.png docs/st
   if [[ -f "$f" ]]; then printf '  %s✓%s %s\n' "$GREEN" "$RESET" "$f"; else warn "missing: $f"; ART_MISSING=1; fi
 done
 if (( ART_MISSING )); then
-  warn "Stemlab has no app icon yet (app/src/main/README.md lists it as not done)."
-  warn "The icon comes first; the three logos are renders of it."
-  SKIPPED+=("Store logos in docs/store/ (needs an app icon first)")
+  warn "They are renders of the app icon: run  cd app && pnpm icons  and re-check."
+  SKIPPED+=("Store logos in docs/store/ (cd app && pnpm icons)")
 fi
 say ""
 say "Screenshots: PNG, 1366 × 768 or 1920 × 1080, all the same size, up to 10."

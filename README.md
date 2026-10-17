@@ -1,5 +1,7 @@
 # Stemlab
 
+<img src="app/assets/icon.png" width="96" alt="" align="right">
+
 A power-user stem separation workbench. Run any separation model you choose, including checkpoints you
 add yourself, with every inference knob exposed. Compose separations as a graph (a *recipe*) of
 separate, subtract, ensemble, post-process, analyze and export steps, and rerun the same recipe on any file.
