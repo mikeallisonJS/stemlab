@@ -37,6 +37,14 @@ name: Release
 #   R2_SECRET_ACCESS_KEY  its secret
 #   R2_BUCKET             bucket name, shared across apps; this writes under stemlab/
 #   R2_PUBLIC_HOST        custom domain on the bucket, e.g. downloads.example.com
+#
+# The Windows installer on R2 is also what the Microsoft Store serves: Partner
+# Center takes that URL (direct, versioned, never changing), which is why the
+# installers are written once and never overwritten. After a tag build, the
+# store-gate job checks the installer is signed and the version is a stable
+# X.Y.Z, then store-submit.yml submits it with the five STORE_* secrets that
+# workflow documents; without them it skips, and the submission is a human's
+# job in Partner Center (scripts/store_setup_wizard.sh).
 on:
   push:
     tags:
@@ -222,3 +230,55 @@ jobs:
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --title "$TAG" --generate-notes
           fi
           gh release upload "$TAG" artifacts/* --repo "$GITHUB_REPOSITORY" --clobber
+
+  # The Store takes a signed installer and a stable version, nothing else.
+  # Both are decided here from the artefact itself rather than from flags the
+  # matrix legs would have to agree on: secrets are not readable from `if:`,
+  # and a job output written by three legs is whichever leg finished last.
+  store-gate:
+    needs: build
+    runs-on: windows-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    outputs:
+      submit: ${{ steps.check.outputs.submit }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Stemlab-Windows
+          path: windows
+      - name: Decide whether this version goes to the Store
+        id: check
+        shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          $version = $env:TAG -replace '^v', ''
+          "version=$version" >> $env:GITHUB_OUTPUT
+          # A v1.2.3-rc1 tag builds and publishes like any other, but a release
+          # candidate is not something to put in front of everyone who has the
+          # app from the Store.
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            Write-Host "$version is not a stable X.Y.Z version - not submitting it to the Store."
+            "submit=false" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+          $installer = Get-Item windows/Stemlab-Setup-*.exe
+          $signature = Get-AuthenticodeSignature $installer.FullName
+          if ($signature.Status -ne 'Valid') {
+            Write-Host "::warning::The installer is unsigned ($($signature.Status)). The Store rejects unsigned packages, so $version is not submitted. Set the six AZURE_SIGN_* secrets and release a new version."
+            "submit=false" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+          Write-Host "Signed by $($signature.SignerCertificate.Subject) - submitting $version"
+          "submit=true" >> $env:GITHUB_OUTPUT
+
+  store:
+    needs: store-gate
+    if: needs.store-gate.outputs.submit == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/store-submit.yml
+    with:
+      version: ${{ needs.store-gate.outputs.version }}
+    secrets: inherit

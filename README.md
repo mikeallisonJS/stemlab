@@ -260,6 +260,31 @@ The release build needs repository secrets, shared with Cadent:
 | --- | --- | --- |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_HOST` | Uploading the auto-update feed to Cloudflare R2 under `stemlab/` | The tag build fails |
 | `AZURE_SIGN_TENANT_ID`, `AZURE_SIGN_CLIENT_ID`, `AZURE_SIGN_CLIENT_SECRET`, `AZURE_SIGN_ENDPOINT`, `AZURE_SIGN_ACCOUNT`, `AZURE_SIGN_PROFILE` | Signing the Windows build | Unsigned Windows build (SmartScreen warns); a partial set fails |
+| `STORE_TENANT_ID`, `STORE_CLIENT_ID`, `STORE_CLIENT_SECRET`, `STORE_SELLER_ID`, `STORE_PRODUCT_ID` | Submitting the signed Windows installer to the Microsoft Store | The Store step skips; submit by hand in Partner Center. A partial set fails |
+
+### Microsoft Store
+
+Stemlab lists on the Store through the MSI/EXE submission path: Partner Center takes the URL of the
+signed installer the tag build published to R2 (`https://downloads.mikeallisonjs.com/stemlab/Stemlab-Setup-X.Y.Z.exe`)
+and serves that same binary. A GitHub Release asset URL cannot be submitted, because it redirects to a
+link that expires within the hour. Every version is a new submission with a new URL, which is why the
+build never overwrites a published installer.
+
+The Store needs a signed installer, so the order is: the six `AZURE_SIGN_*` secrets, then a release,
+then the Store. Two wizards walk the one-time human steps and save what they capture to a gitignored `.env`:
+
+1. `bash scripts/store_setup_wizard.sh`, after the first release: copies the signing secrets from Cadent's
+   checkout if they are missing, checks the latest release is on R2 and signed, then walks creating the app
+   in Partner Center and its first submission. The listing copy is in `docs/store-listing.md`, the screenshot
+   shot list in `docs/store-screenshots.md`, the privacy policy the listing links to in `docs/privacy-policy.md`.
+   It exits early, with the release path, when there is no release yet.
+2. `bash scripts/store_api_wizard.sh`, once the app is in the Store: gives CI the Partner Center credentials
+   (the five `STORE_*` secrets). From then on `release.yml` submits each signed stable version itself:
+   `store-gate` checks the installer's signature, `store-submit.yml` runs `scripts/store_submit.py`, which
+   points the draft at the new URL, waits for the Store to scan it and submits for certification.
+
+To submit a version by hand, or retry one: `gh workflow run store-submit.yml -f version=X.Y.Z`
+(`-f force=true` resubmits a draft that already points at that version).
 
 ## Support
 

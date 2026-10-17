@@ -81,9 +81,11 @@ the installers and their `.blockmap` files for differential downloads.
 `electron-builder.cjs` bakes the folder's URL into the app
 (`STEMLAB_UPDATE_URL`, default `https://downloads.mikeallisonjs.com/stemlab`),
 and the release workflow uploads the files there on a `v*` tag: Cloudflare R2
-behind that custom domain, using the same five `R2_*` secrets as Cadent. The
-repository is private, so GitHub releases cannot serve the feed. Installers
-are written once per version; only `latest*.yml` is overwritten.
+behind that custom domain, using the same five `R2_*` secrets as Cadent. A
+GitHub Release asset URL redirects to an expiring link, which the Microsoft
+Store rejects, and the Store takes the same installer from the same host
+(README: Microsoft Store). Installers are written once per version; only
+`latest*.yml` is overwritten.
 
 macOS: updates need a signed and notarized app, which is not set up, so the
 check reports an error there until it is. Windows updates are verified
