@@ -59,8 +59,11 @@ const UPDATE_URL = process.env.STEMLAB_UPDATE_URL || "https://downloads.mikealli
 module.exports = {
   appId: "dev.stemlab.app",
   productName: "Stemlab",
-  directories: { output: "release", buildResources: "build/resources" },
-  files: ["dist-electron/**", "package.json"],
+  // assets/ rather than the default build/: build/ is gitignored (the engine is
+  // assembled there), and the icon is a source. assets/icon.png is rendered by
+  // scripts/build-icons.mjs; electron-builder derives the .ico and .icns from it.
+  directories: { output: "release", buildResources: "assets" },
+  files: ["dist-electron/**", "assets/icon.png", "package.json"],
   // The engine: the wheel, recipes, MSST, the built UI and FFmpeg (scripts/prepare-engine.mjs)
   extraResources: [{ from: "build/engine", to: "engine" }],
   asar: true,

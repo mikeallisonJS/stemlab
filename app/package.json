@@ -14,9 +14,11 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.main.json",
     "test": "vitest run",
     "prepare:engine": "node scripts/prepare-engine.mjs",
+    "icons": "node scripts/build-icons.mjs",
     "dist": "pnpm build && pnpm build:main && pnpm prepare:engine && electron-builder --config electron-builder.cjs --publish never"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^26.6.5",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
