@@ -1,7 +1,7 @@
 """
 Tests that run real models.
 
-They need the bootstrapped backends (`captainstems bootstrap`) and model
+They need the bootstrapped backends (`stemlab bootstrap`) and model
 weights, which are fetched into the real registry on first use. Without torch
 they are skipped. Run only these with: pytest -m models
 """
@@ -12,12 +12,12 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from captainstems import audio, recipe, runner
-from captainstems.registry import Registry, load_curated
+from stemlab import audio, recipe, runner
+from stemlab.registry import Registry, load_curated
 
 pytestmark = pytest.mark.models
 
-torch = pytest.importorskip("torch", reason="run `captainstems bootstrap` first")
+torch = pytest.importorskip("torch", reason="run `stemlab bootstrap` first")
 
 
 def model(real_home, model_id):
@@ -127,7 +127,7 @@ nodes:
 
 
 def test_mdx_net_onnx_model(real_home, clip, tmp_path):
-    pytest.importorskip("onnxruntime", reason="run `captainstems bootstrap` first")
+    pytest.importorskip("onnxruntime", reason="run `stemlab bootstrap` first")
     registry = model(real_home, "uvr-mdx-kim-vocal-2")
     text = """
 nodes:
@@ -146,7 +146,7 @@ nodes:
 @pytest.mark.parametrize("overlap, batch_size", [(1, 1), (1, 3), (2, 1), (4, 2)])
 def test_msst_overlap_add_has_no_gaps(overlap, batch_size):
     """An identity network must hand back its input, also when chunks only touch (overlap 1)."""
-    from captainstems.backends.msst import MsstModel, _import_upstream
+    from stemlab.backends.msst import MsstModel, _import_upstream
 
     _, _, windowing = _import_upstream()
     model = MsstModel(lambda batch: batch.unsqueeze(1), {}, "scnet", "cpu", ["same"], 44100, windowing)

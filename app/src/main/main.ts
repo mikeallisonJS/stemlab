@@ -1,14 +1,14 @@
 // The desktop shell: starts the API server as a child process, waits until it
 // answers, then shows the UI. The renderer is the same React app that runs in
-// a browser; the server is `python -m captainstems serve` on a free port.
+// a browser; the server is `python -m stemlab serve` on a free port.
 //
 // Where the Python environment comes from, in order:
-//   CAPTAINSTEMS_API     an already running server; nothing is spawned
-//   CAPTAINSTEMS_PYTHON  a python interpreter with captainstems installed
+//   STEMLAB_API     an already running server; nothing is spawned
+//   STEMLAB_PYTHON  a python interpreter with stemlab installed
 //   packaged app         its own environment under the user data folder,
 //                        created on the first start (python.ts)
 //   <repo>/.venv         the development environment made by `uv sync`
-//   uv                   `uv run captainstems serve` in the repository
+//   uv                   `uv run stemlab serve` in the repository
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
@@ -56,13 +56,21 @@ function status(message: string): void {
   setState({ phase: "starting", message, actions: [] });
 }
 
+// The window icon. Windows and macOS take the packaged app's icon for the
+// taskbar and dock anyway; this is for Linux and for running from a checkout.
+const WINDOW_ICON = (() => {
+  const file = path.join(app.getAppPath(), "assets", "icon.png");
+  return fs.existsSync(file) ? file : undefined;
+})();
+
 function showLoading(): BrowserWindow {
   const win = new BrowserWindow({
     width: 640,
     height: 440,
     resizable: false,
     autoHideMenuBar: true,
-    title: "CaptainStems",
+    title: "Stemlab",
+    icon: WINDOW_ICON,
     backgroundColor: "#16181d",
     webPreferences: { preload: PRELOAD, contextIsolation: true, sandbox: true },
   });
@@ -82,7 +90,7 @@ function ask(message: string, actions: ShellState["actions"], phase: ShellState[
   return new Promise<ShellState["actions"][number]>((resolve) => {
     setState({ phase, message, actions });
     // Smoke-test aid: answer every question with this action, when it is offered
-    const scripted = process.env.CAPTAINSTEMS_DEBUG_ANSWER as ShellState["actions"][number] | undefined;
+    const scripted = process.env.STEMLAB_DEBUG_ANSWER as ShellState["actions"][number] | undefined;
     if (scripted && actions.includes(scripted)) return resolve(scripted);
     pendingAction = resolve;
   });
@@ -97,28 +105,28 @@ ipcMain.on("action", (_event, name: ShellState["actions"][number]) => {
 
 // The Python environment ------------------------------------------------------
 
-/** Managed environment: the packaged app, or CAPTAINSTEMS_MANAGED=1 to try it from a checkout. */
+/** Managed environment: the packaged app, or STEMLAB_MANAGED=1 to try it from a checkout. */
 function managed(): boolean {
-  return app.isPackaged || Boolean(process.env.CAPTAINSTEMS_MANAGED);
+  return app.isPackaged || Boolean(process.env.STEMLAB_MANAGED);
 }
 
 /** The engine resources: the wheel, recipes, MSST and the built UI (see scripts/prepare-engine.mjs). */
 function engineDir(): string {
-  return process.env.CAPTAINSTEMS_ENGINE ?? path.join(process.resourcesPath, "engine");
+  return process.env.STEMLAB_ENGINE ?? path.join(process.resourcesPath, "engine");
 }
 
 function developmentPython(): Python | null {
-  const explicit = process.env.CAPTAINSTEMS_PYTHON;
-  if (explicit) return { command: explicit, args: ["-m", "captainstems"], describe: explicit, root: REPO_ROOT, env: {} };
+  const explicit = process.env.STEMLAB_PYTHON;
+  if (explicit) return { command: explicit, args: ["-m", "stemlab"], describe: explicit, root: REPO_ROOT, env: {} };
   const venv = path.join(REPO_ROOT, ".venv", process.platform === "win32" ? "Scripts\\python.exe" : "bin/python");
-  if (fs.existsSync(venv)) return { command: venv, args: ["-m", "captainstems"], describe: venv, root: REPO_ROOT, env: {} };
+  if (fs.existsSync(venv)) return { command: venv, args: ["-m", "stemlab"], describe: venv, root: REPO_ROOT, env: {} };
   const uv = spawnSync(process.platform === "win32" ? "where" : "which", ["uv"], { encoding: "utf8" });
   if (uv.status === 0 && uv.stdout.trim()) {
     const binary = uv.stdout.trim().split(/\r?\n/)[0];
     return {
       command: binary,
-      args: ["run", "--project", REPO_ROOT, "captainstems"],
-      describe: "uv run captainstems",
+      args: ["run", "--project", REPO_ROOT, "stemlab"],
+      describe: "uv run stemlab",
       root: REPO_ROOT,
       env: {},
     };
@@ -228,7 +236,7 @@ async function startServer(python: Python, port?: number): Promise<string> {
   server.on("exit", (code, signal) => {
     exited = `The server stopped (${signal ?? `exit code ${code}`}).`;
     if (main && !main.isDestroyed()) {
-      dialog.showErrorBox("CaptainStems", `${exited}\n\n${log.slice(-15).join("\n")}`);
+      dialog.showErrorBox("Stemlab", `${exited}\n\n${log.slice(-15).join("\n")}`);
       app.quit();
     }
   });
@@ -260,7 +268,7 @@ function stopServer(): void {
   server = null;
 }
 
-/** `captainstems bootstrap`: torch for the detected GPU, the model libraries, onnxruntime. */
+/** `stemlab bootstrap`: torch for the detected GPU, the model libraries, onnxruntime. */
 function runBootstrap(python: Python): Promise<number> {
   return new Promise((resolve) => {
     logLine(`$ ${python.describe} bootstrap`);
@@ -305,14 +313,15 @@ function showMain(url: string, api: string): BrowserWindow {
     minWidth: 960,
     minHeight: 600,
     autoHideMenuBar: true,
-    title: "CaptainStems",
+    title: "Stemlab",
+    icon: WINDOW_ICON,
     backgroundColor: "#16181d",
     show: false,
     webPreferences: {
       preload: PRELOAD,
       contextIsolation: true,
       sandbox: true,
-      additionalArguments: [`--captainstems-api=${api}`, `--captainstems-version=${app.getVersion()}`],
+      additionalArguments: [`--stemlab-api=${api}`, `--stemlab-version=${app.getVersion()}`],
     },
   });
   win.webContents.setWindowOpenHandler(({ url: target }) => {
@@ -323,7 +332,7 @@ function showMain(url: string, api: string): BrowserWindow {
     win.show();
     loading?.close();
     loading = null;
-    const screenshot = process.env.CAPTAINSTEMS_DEBUG_SCREENSHOT;
+    const screenshot = process.env.STEMLAB_DEBUG_SCREENSHOT;
     if (screenshot) {
       // Smoke-test aid: save a picture of the window once the UI has rendered, then quit
       setTimeout(() => {
@@ -375,7 +384,7 @@ function offerRestart(info: UpdateInfo): void {
       buttons: ["Restart now", "Later"],
       defaultId: 0,
       cancelId: 1,
-      message: `CaptainStems ${info.version} is ready`,
+      message: `Stemlab ${info.version} is ready`,
       detail: "The update is installed when the app restarts. Later installs it on the next quit.",
     })
     .then(({ response }) => {
@@ -409,9 +418,9 @@ async function start(): Promise<void> {
   loading = showLoading();
   status("Starting…");
 
-  const attach = process.env.CAPTAINSTEMS_API;
+  const attach = process.env.STEMLAB_API;
   if (attach) {
-    logLine(`Using the server at ${attach} (CAPTAINSTEMS_API)`);
+    logLine(`Using the server at ${attach} (STEMLAB_API)`);
     apiUrl = attach.replace(/\/$/, "");
   } else {
     while (!python) {
@@ -525,9 +534,9 @@ async function rebootstrap(): Promise<void> {
 
 ipcMain.on("bootstrap", () => void rebootstrap());
 
-if (process.env.CAPTAINSTEMS_DATA) {
+if (process.env.STEMLAB_DATA) {
   // Testing aid: a user data folder other than the real one
-  app.setPath("userData", process.env.CAPTAINSTEMS_DATA);
+  app.setPath("userData", process.env.STEMLAB_DATA);
 }
 
 if (!app.requestSingleInstanceLock()) {
@@ -546,7 +555,7 @@ if (!app.requestSingleInstanceLock()) {
   process.on("exit", stopServer);
   void app.whenReady().then(() =>
     start().catch((error) => {
-      dialog.showErrorBox("CaptainStems", String((error as Error).stack ?? error));
+      dialog.showErrorBox("Stemlab", String((error as Error).stack ?? error));
       app.quit();
     }),
   );

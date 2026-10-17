@@ -2,7 +2,7 @@ import json
 
 from typer.testing import CliRunner
 
-from captainstems.cli import app
+from stemlab.cli import app
 
 runner = CliRunner()
 

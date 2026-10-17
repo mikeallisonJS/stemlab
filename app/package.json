@@ -1,8 +1,8 @@
 {
-  "name": "captainstems-app",
+  "name": "stemlab-app",
   "private": true,
-  "version": "2.0.0-dev.0",
-  "description": "CaptainStems UI: recipe editor, run queue and results",
+  "version": "1.0.0-dev.0",
+  "description": "Stemlab UI: recipe editor, run queue and results",
   "main": "dist-electron/main.cjs",
   "type": "module",
   "scripts": {
@@ -14,9 +14,11 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.main.json",
     "test": "vitest run",
     "prepare:engine": "node scripts/prepare-engine.mjs",
+    "icons": "node scripts/build-icons.mjs",
     "dist": "pnpm build && pnpm build:main && pnpm prepare:engine && electron-builder --config electron-builder.cjs --publish never"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^26.6.5",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

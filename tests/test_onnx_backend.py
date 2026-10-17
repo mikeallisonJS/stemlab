@@ -3,9 +3,9 @@ import threading
 import numpy as np
 import pytest
 
-from captainstems.backends import onnx as onnx_backend
-from captainstems.backends.base import Cancelled
-from captainstems.backends.onnx import OnnxBackend, OnnxModel
+from stemlab.backends import onnx as onnx_backend
+from stemlab.backends.base import Cancelled
+from stemlab.backends.onnx import OnnxBackend, OnnxModel
 
 
 class Input:
@@ -148,7 +148,7 @@ def test_device_resolution_uses_the_available_providers(monkeypatch):
 
 
 def test_manifest_compensate_becomes_the_default(home):
-    from captainstems.registry import Manifest, Model
+    from stemlab.registry import Manifest, Model
 
     manifest = Manifest(
         id="mdx", backend="onnx", weights="model.onnx", stems=["vocals"], onnx_params={**PARAMS, "compensate": 1.009}

@@ -57,3 +57,5 @@ app/node_modules/
 app/dist/
 app/out/
 app/release/
+.env
+.wrangler/

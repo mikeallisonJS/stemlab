@@ -1,6 +1,6 @@
 # Drums, bass, other and vocals with HT Demucs.
 #
-# Models: captainstems models fetch htdemucs
+# Models: stemlab models fetch htdemucs
 version: 1
 name: four-stems
 

@@ -1,4 +1,4 @@
-"""Shared fixtures. Tests never touch the real ~/.captainstems unless they ask for models."""
+"""Shared fixtures. Tests never touch the real ~/.stemlab unless they ask for models."""
 
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 # Model tests reuse the real registry so weights are downloaded once; everything
 # else runs against a throwaway home.
-REAL_HOME = os.environ.get("CAPTAINSTEMS_HOME") or str(Path.home() / ".captainstems")
-os.environ["CAPTAINSTEMS_HOME"] = tempfile.mkdtemp(prefix="captainstems_test_home_")
+REAL_HOME = os.environ.get("STEMLAB_HOME") or str(Path.home() / ".stemlab")
+os.environ["STEMLAB_HOME"] = tempfile.mkdtemp(prefix="stemlab_test_home_")
 
 
 @pytest.fixture
@@ -26,15 +26,15 @@ def clip() -> Path:
 
 @pytest.fixture
 def home(tmp_path, monkeypatch) -> Path:
-    """A fresh, empty CaptainStems home for one test."""
-    monkeypatch.setenv("CAPTAINSTEMS_HOME", str(tmp_path / "home"))
+    """A fresh, empty Stemlab home for one test."""
+    monkeypatch.setenv("STEMLAB_HOME", str(tmp_path / "home"))
     return tmp_path / "home"
 
 
 @pytest.fixture
 def real_home(monkeypatch) -> Path:
     """The user's real home, for tests that need downloaded model weights."""
-    monkeypatch.setenv("CAPTAINSTEMS_HOME", REAL_HOME)
+    monkeypatch.setenv("STEMLAB_HOME", REAL_HOME)
     return Path(REAL_HOME)
 
 
@@ -66,7 +66,7 @@ class FakeModel:
         self.closed = False
 
     def separate(self, audio, sample_rate, params, progress=None, cancel=None):
-        from captainstems.backends.base import check_cancel
+        from stemlab.backends.base import check_cancel
 
         self.backend.calls.append({"params": dict(params), "shape": audio.shape, "sample_rate": sample_rate})
         result = {}
@@ -92,7 +92,7 @@ class FakeBackend:
     name = "msst"
 
     def __init__(self):
-        from captainstems.backends.base import COMMON_PARAMS, ParamSpec
+        from stemlab.backends.base import COMMON_PARAMS, ParamSpec
 
         self.supported_params = {
             **COMMON_PARAMS,
@@ -113,7 +113,7 @@ class FakeBackend:
         return {"fake": "1.0"}
 
     def resolve_device(self, requested):
-        from captainstems.backends import device
+        from stemlab.backends import device
 
         return device.resolve_device(requested)
 
@@ -134,7 +134,7 @@ class FakeBackend:
 @pytest.fixture
 def fake_backend(monkeypatch):
     """Replace every backend with a fake that needs neither torch nor weights."""
-    from captainstems.backends import base, device
+    from stemlab.backends import base, device
 
     backend = FakeBackend()
     monkeypatch.setattr(base, "_instances", {name: backend for name in base.BACKENDS})
@@ -148,7 +148,7 @@ def fake_backend(monkeypatch):
 
 def add_fake_model(registry, model_id, stems, sample_rate=44100, defaults=None, backend="msst"):
     """Register a model whose weights are a small dummy file."""
-    from captainstems.registry import Manifest
+    from stemlab.registry import Manifest
 
     folder = registry.root / model_id
     folder.mkdir(parents=True, exist_ok=True)
@@ -170,7 +170,7 @@ def add_fake_model(registry, model_id, stems, sample_rate=44100, defaults=None, 
 @pytest.fixture
 def registry(home, fake_backend):
     """A registry in a fresh home with a few fake models installed."""
-    from captainstems.registry import Registry
+    from stemlab.registry import Registry
 
     registry = Registry()
     add_fake_model(registry, "vocal-model", ["vocals"])

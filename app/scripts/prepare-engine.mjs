@@ -1,14 +1,14 @@
 // Assembles build/engine, the resources the packaged app ships beside the
 // Electron shell (electron-builder's extraResources):
 //
-//   captainstems-<version>-py3-none-any.whl   the engine, built with uv
+//   stemlab-<version>-py3-none-any.whl   the engine, built with uv
 //   recipes/                                  the example recipes
 //   third_party/msst/                         the MSST submodule (its code and configs)
 //   app/dist/                                 the built UI, hosted by the server
 //   bin/ffmpeg[.exe]                          FFmpeg, when one is found (FFMPEG env or PATH)
 //
 // On the first start the app installs the wheel into its own Python environment
-// and points CAPTAINSTEMS_ROOT at this folder, which is laid out like the repository.
+// and points STEMLAB_ROOT at this folder, which is laid out like the repository.
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";

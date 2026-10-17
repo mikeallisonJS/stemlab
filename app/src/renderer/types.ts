@@ -1,4 +1,4 @@
-// Shapes of what the API sends. They mirror captainstems/recipe.py and server/jobs.py.
+// Shapes of what the API sends. They mirror stemlab/recipe.py and server/jobs.py.
 
 export type Op = "separate" | "subtract" | "ensemble" | "postprocess" | "analyze" | "export";
 

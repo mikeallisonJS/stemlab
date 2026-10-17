@@ -1,29 +1,36 @@
-# CaptainStems
+# Stemlab
+
+<img src="app/assets/icon.png" width="96" alt="" align="right">
 
 A power-user stem separation workbench. Run any separation model you choose, including checkpoints you
 add yourself, with every inference knob exposed. Compose separations as a graph (a *recipe*) of
 separate, subtract, ensemble, post-process, analyze and export steps, and rerun the same recipe on any file.
 
-This is version 2, a rewrite around a recipe engine. The original PyQt application is kept in
-[`archive/v1/`](archive/v1/). Plan and decisions:
-[CaptainStems v2 handoff](https://claude.ai/artifact/FoargYKnKDffjnQYnFNWzF).
+The first release is 1.0. The code is a rewrite around a recipe engine of an earlier PyQt application
+that was never released; it is kept in [`archive/v1/`](archive/v1/). Plan and decisions:
+[Stemlab v2 handoff](https://claude.ai/artifact/FoargYKnKDffjnQYnFNWzF).
+
+Stemlab was called CaptainStems before its first release. The package, the CLI (`stemlab`), the
+environment variables (`STEMLAB_*`) and the data folder (`~/.stemlab`) all carry the new name; an existing
+`~/.captainstems` is renamed to `~/.stemlab` on first start, so downloaded models are kept.
 
 | Part | Where | What |
 | --- | --- | --- |
-| Engine and CLI | `captainstems/` | Recipes, runner, cache, model registry, backends |
-| API server | `captainstems/server/` | FastAPI and WebSocket, local only |
+| Engine and CLI | `stemlab/` | Recipes, runner, cache, model registry, backends |
+| API server | `stemlab/server/` | FastAPI and WebSocket, local only |
 | UI | `app/` | React: recipe graph, run queue, results |
+| Desktop shell | `app/src/main/` | Electron: starts the server, first-run setup, auto-update |
 
 ## Setup
 
 Requires [uv](https://docs.astral.sh/uv/), git, and for the UI [pnpm](https://pnpm.io/).
 
 ```
-git clone --recurse-submodules https://github.com/mikeallisonJS/CaptainStems
-cd CaptainStems
+git clone --recurse-submodules https://github.com/mikeallisonJS/Stemlab
+cd Stemlab
 uv sync --extra dev --extra server
-uv run captainstems bootstrap
-uv run captainstems doctor
+uv run stemlab bootstrap
+uv run stemlab doctor
 ```
 
 `bootstrap` installs the build of PyTorch that matches your GPU, the model libraries and one build of
@@ -48,8 +55,8 @@ Tested so far: Windows with an NVIDIA GPU, and Windows with a Radeon 8060S (Ryze
 ## Quick start
 
 ```
-uv run captainstems models fetch htdemucs
-uv run captainstems run recipes/four-stems.yaml song.flac
+uv run stemlab models fetch htdemucs
+uv run stemlab run recipes/four-stems.yaml song.flac
 ```
 
 The stems and a `run.json` land in `song [four-stems]/` next to the input. Use `--out` to choose the
@@ -94,32 +101,32 @@ nodes:
 can mean different things per backend (`overlap` is a count of chunks for MSST and a fraction for Demucs
 and ONNX); a default is applied to the nodes it fits.
 
-`captainstems validate recipe.yaml` checks a recipe against the installed models and prints every node's
-fully resolved parameters. `captainstems schema --backends` prints the JSON Schema of the format and of
+`stemlab validate recipe.yaml` checks a recipe against the installed models and prints every node's
+fully resolved parameters. `stemlab schema --backends` prints the JSON Schema of the format and of
 each backend's knobs. Examples are in [`recipes/`](recipes/), including the worked example from the handoff.
 
 ### Reproducibility
 
 Every run writes `run.json` beside its outputs: the recipe, the resolved parameters of each node, the
-SHA-256 of the input and of every model file, and the backend versions. `captainstems run run.json song.flac`
+SHA-256 of the input and of every model file, and the backend versions. `stemlab run run.json song.flac`
 repeats a run with exactly those parameters.
 
-Intermediate stems are cached under `~/.captainstems/cache`, keyed by a node's parameters, its model's
-hash and its inputs, so rerunning a recipe only recomputes what changed (`captainstems cache info|clear`).
+Intermediate stems are cached under `~/.stemlab/cache`, keyed by a node's parameters, its model's
+hash and its inputs, so rerunning a recipe only recomputes what changed (`stemlab cache info|clear`).
 A run that is cancelled or fails writes no output files.
 
 ## Models
 
-Models live in `~/.captainstems/models/`, one folder per model with a `manifest.json`, its config and its
-weights. Set `CAPTAINSTEMS_HOME` to move everything CaptainStems stores.
+Models live in `~/.stemlab/models/`, one folder per model with a `manifest.json`, its config and its
+weights. Set `STEMLAB_HOME` to move everything Stemlab stores.
 
 ```
-uv run captainstems models list
-uv run captainstems models fetch mel-band-roformer-deux scnet-xl-ihf
-uv run captainstems models verify
+uv run stemlab models list
+uv run stemlab models fetch mel-band-roformer-deux scnet-xl-ihf
+uv run stemlab models verify
 ```
 
-The curated list (`captainstems models list`) holds, as of October 2026: becruily's Mel-Band RoFormer Deux
+The curated list (`stemlab models list`) holds, as of October 2026: becruily's Mel-Band RoFormer Deux
 (vocals and instrumental in one pass, the best all-rounder), unwa's BS-RoFormer Resurrection (vocal and
 instrumental variants), Kim's and viperx's older vocal models, SCNet XL IHF and HT Demucs for 4 and 6 stems,
 and single-purpose models for dereverb, denoise and karaoke (lead against backing vocals). The
@@ -142,7 +149,7 @@ part of this repository and carry their own licenses, shown in `models list --js
 ### Adding your own model
 
 ```
-uv run captainstems models add my-vocals --backend msst --arch mel_band_roformer \
+uv run stemlab models add my-vocals --backend msst --arch mel_band_roformer \
     --config path/to/config.yaml --weights path/to/model.ckpt --stems vocals -d overlap=4
 ```
 
@@ -157,7 +164,7 @@ source, add `--unsafe-pickle`.
 ## UI
 
 ```
-uv run captainstems serve          # API on http://127.0.0.1:8787
+uv run stemlab serve          # API on http://127.0.0.1:8787
 cd app && pnpm i && pnpm dev       # UI with hot reload on http://localhost:5173
 ```
 
@@ -182,11 +189,37 @@ server then serves it.
   reinstall the model libraries from there, a browser shows the `bootstrap` command to run.
 
 The server listens on the local machine only and has no authentication. The desktop app (`app/src/main/`)
-spawns it on a free port, offers to run `bootstrap` on the first start and stops it on exit. `cd app && pnpm dist`
-builds the installer (NSIS, AppImage or dmg): the installed app creates its own Python environment with uv on
-the first start, so the installer stays small and one build serves every GPU. Pushing a `v*` tag builds all
-three on GitHub Actions, signs the Windows build when the signing secrets are set, and publishes the
-auto-update feed the installed apps poll (`app/src/main/README.md`).
+spawns it on a free port, offers to run `bootstrap` on the first start and stops it on exit.
+
+## Building the installer
+
+Needs everything from Setup plus Node 24 and pnpm 11, the MSST submodule checked out
+(`git submodule update --init`), and FFmpeg on the `PATH` (or named in `FFMPEG`) to bundle it.
+
+```
+cd app
+pnpm i
+pnpm dist
+```
+
+`pnpm dist` builds the UI and the Electron shell, then `scripts/prepare-engine.mjs` assembles
+`app/build/engine`: the engine as a wheel (`uv build`), `recipes/`, the MSST submodule, the built UI and
+FFmpeg. electron-builder packs that beside the shell and writes the installer for the current OS to
+`app/release/`:
+
+| OS | Installer |
+| --- | --- |
+| Windows | `Stemlab-Setup-<version>.exe` (NSIS) |
+| Linux | `Stemlab-<version>.AppImage` |
+| macOS | `Stemlab-<version>.dmg`, plus a `.zip` for auto-update |
+
+No Python, torch or model ships in the installer. On its first start the installed app downloads a pinned
+uv, creates its own Python environment in the user data folder, installs the bundled wheel and then offers
+`bootstrap` for the GPU libraries, so the installer stays small and one build serves every GPU.
+
+A local build is unsigned unless the six Azure Artifact Signing variables are set; macOS builds are not
+signed or notarized yet. Signing, the auto-update feed and the variables that point a checkout at a
+packaged-style setup are described in [`app/src/main/README.md`](app/src/main/README.md).
 
 ## Development
 
@@ -199,6 +232,66 @@ cd app && pnpm test && pnpm typecheck
 
 `CLAUDE.md` has the rules of the codebase. MSST is a pinned submodule at `third_party/msst`; it is wrapped,
 never modified.
+
+## Releases
+
+Changeset-style, the same flow as Cadent: each PR declares its release intent as a fragment, a
+bot-maintained release PR aggregates them, merging that PR ships. Versions are never bumped and `v*` tags
+are never pushed by hand. The version in the tree is `1.0.0.dev0`, so the first release PR is `v1.0.0`.
+
+1. A PR that touches `stemlab/`, the app, `recipes/`, `third_party/` or `pyproject.toml` adds one file
+   `changelog.d/<issue>.<type>.md` (or `+<slug>.<type>.md` without an issue). `changelog-check` fails the
+   PR without one. Types `breaking`, `feature` and `bugfix` render into `CHANGELOG.md` and decide the bump
+   (`breaking` is major, `feature` minor, `bugfix` patch); `chore` and `docs` never render and only ever
+   mean a patch. A `.devN` version releases as its base version whatever the fragments say. The body is
+   one or two sentences in a user-facing voice.
+2. Every push to `main` runs `release-pr.yml`: it computes the next version, writes it to
+   `pyproject.toml`, `stemlab/__init__.py`, `app/package.json` and `uv.lock`, renders the fragments into
+   `CHANGELOG.md` with towncrier, and keeps a `release/next` PR up to date with all of it.
+3. Merging the release PR is the release decision. `tag-release.yml` tags the merge commit `vX.Y.Z`,
+   drafts the GitHub Release with the changelog section as its body, and dispatches `release.yml` at the
+   tag, which builds and signs the installers, publishes the update feed to R2 and attaches the files to
+   the draft. Publishing the draft is the last human step.
+
+`uv run --with towncrier python scripts/release.py next-version` shows what the pending fragments add
+up to.
+
+The release build needs repository secrets, shared with Cadent:
+
+| Secrets | Needed for | Without them |
+| --- | --- | --- |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_HOST` | Uploading the auto-update feed to Cloudflare R2 under `stemlab/` | The tag build fails |
+| `AZURE_SIGN_TENANT_ID`, `AZURE_SIGN_CLIENT_ID`, `AZURE_SIGN_CLIENT_SECRET`, `AZURE_SIGN_ENDPOINT`, `AZURE_SIGN_ACCOUNT`, `AZURE_SIGN_PROFILE` | Signing the Windows build | Unsigned Windows build (SmartScreen warns); a partial set fails |
+| `STORE_TENANT_ID`, `STORE_CLIENT_ID`, `STORE_CLIENT_SECRET`, `STORE_SELLER_ID`, `STORE_PRODUCT_ID` | Submitting the signed Windows installer to the Microsoft Store | The Store step skips; submit by hand in Partner Center. A partial set fails |
+
+### Microsoft Store
+
+Stemlab lists on the Store through the MSI/EXE submission path: Partner Center takes the URL of the
+signed installer the tag build published to R2 (`https://downloads.mikeallisonjs.com/stemlab/Stemlab-Setup-X.Y.Z.exe`)
+and serves that same binary. A GitHub Release asset URL cannot be submitted, because it redirects to a
+link that expires within the hour. Every version is a new submission with a new URL, which is why the
+build never overwrites a published installer.
+
+The Store needs a signed installer, so the order is: the six `AZURE_SIGN_*` secrets, then a release,
+then the Store. Two wizards walk the one-time human steps and save what they capture to a gitignored `.env`:
+
+1. `bash scripts/store_setup_wizard.sh`, after the first release: copies the signing secrets from Cadent's
+   checkout if they are missing, checks the latest release is on R2 and signed, then walks creating the app
+   in Partner Center and its first submission. The listing copy is in `docs/store-listing.md`, the screenshot
+   shot list in `docs/store-screenshots.md`, the privacy policy the listing links to in `docs/privacy-policy.md`.
+   It exits early, with the release path, when there is no release yet.
+2. `bash scripts/store_api_wizard.sh`, once the app is in the Store: gives CI the Partner Center credentials
+   (the five `STORE_*` secrets). From then on `release.yml` submits each signed stable version itself:
+   `store-gate` checks the installer's signature, `store-submit.yml` runs `scripts/store_submit.py`, which
+   points the draft at the new URL, waits for the Store to scan it and submits for certification.
+
+To submit a version by hand, or retry one: `gh workflow run store-submit.yml -f version=X.Y.Z`
+(`-f force=true` resubmits a draft that already points at that version).
+
+## Support
+
+Stemlab is free and MIT licensed. If it saves you time, you can support the work on
+[GitHub Sponsors](https://github.com/sponsors/mikeallisonJS) or [donate directly](https://captainssounds.com/donate).
 
 ## License
 

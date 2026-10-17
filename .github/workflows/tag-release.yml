@@ -1,0 +1,66 @@
+# Tag on release-PR merge: reads the just-merged version from pyproject.toml,
+# tags the merge commit, drafts the GitHub Release with the curated
+# CHANGELOG.md section (auto-generated notes kept as an appendix), and
+# dispatches release.yml at the tag. The explicit dispatch exists because a
+# GITHUB_TOKEN-pushed tag never fires `on: push: tags`. release.yml builds the
+# installers, publishes the auto-update feed and attaches the files to the
+# draft; publishing the draft stays a human step.
+
+name: tag-release
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  tag:
+    # Only release-pr.yml's PR: `release/next` in this repository, not a fork's branch of that name
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'release/next' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Read version from pyproject.toml
+        id: version
+        run: |
+          version=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Push tag
+        env:
+          V: ${{ steps.version.outputs.version }}
+          SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          # release.py only ever writes X.Y.Z here; anything else is a hand edit, not a release
+          if ! [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::pyproject.toml has version '$V', not X.Y.Z - not tagging it."
+            exit 1
+          fi
+          git tag "v$V" "$SHA"
+          git push origin "v$V"
+
+      - name: Draft the release with curated notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          python3 scripts/release.py notes --version "$V" > body.md
+          echo "" >> body.md
+          echo "<details><summary>All changes</summary>" >> body.md
+          echo "" >> body.md
+          gh api "repos/${{ github.repository }}/releases/generate-notes" -f tag_name="v$V" -q .body >> body.md
+          echo "" >> body.md
+          echo "</details>" >> body.md
+          gh release create "v$V" --draft --title "v$V" --notes-file body.md
+
+      - name: Build the installers at the tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.version.outputs.version }}
+        run: gh workflow run release.yml --ref "v$V"

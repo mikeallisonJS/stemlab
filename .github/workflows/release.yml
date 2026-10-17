@@ -1,7 +1,10 @@
 name: Release
 
-# Builds the desktop app for each platform when a version tag is pushed and
-# attaches the installers to a draft GitHub release.
+# Builds the desktop app for each platform at a version tag and attaches the
+# installers to the draft GitHub release for that tag. tag-release.yml creates
+# the tag and the draft when a release PR merges, then dispatches this workflow
+# at the tag (a GITHUB_TOKEN-pushed tag never fires `on: push: tags`). A tag
+# pushed by hand still works: the release job drafts the release itself.
 #
 # Windows signing is optional and secret-gated, the same shape and the same
 # six secrets as Cadent's build-installer workflow, so one Azure Artifact
@@ -23,16 +26,25 @@ name: Release
 # the short-lived certificate. macOS builds are unsigned for now.
 #
 # Tag builds also publish the auto-update feed - the installers, their
-# blockmaps and latest*.yml - to Cloudflare R2, gated the same way on the five
-# secrets Cadent's workflow uses for the same bucket. The installed app checks
-# https://<R2_PUBLIC_HOST>/captainstems/ (app/electron-builder.cjs), which
+# blockmaps and latest*.yml - to Cloudflare R2 with the five secrets Cadent's
+# workflow uses for the same bucket. A tag build without them fails: a release
+# is not a release until installed apps can find it. The installed app checks
+# https://<R2_PUBLIC_HOST>/stemlab/ (app/electron-builder.cjs), which
 # must be a custom domain on the bucket: Cloudflare rate-limits r2.dev.
 #
 #   R2_ACCOUNT_ID         Cloudflare account id (the r2.cloudflarestorage host)
 #   R2_ACCESS_KEY_ID      R2 API token, Object Read & Write on the bucket
 #   R2_SECRET_ACCESS_KEY  its secret
-#   R2_BUCKET             bucket name, shared across apps; this writes under captainstems/
+#   R2_BUCKET             bucket name, shared across apps; this writes under stemlab/
 #   R2_PUBLIC_HOST        custom domain on the bucket, e.g. downloads.example.com
+#
+# The Windows installer on R2 is also what the Microsoft Store serves: Partner
+# Center takes that URL (direct, versioned, never changing), which is why the
+# installers are written once and never overwritten. After a tag build, the
+# store-gate job checks the installer is signed and the version is a stable
+# X.Y.Z, then store-submit.yml submits it with the five STORE_* secrets that
+# workflow documents; without them it skips, and the submission is a human's
+# job in Partner Center (scripts/store_setup_wizard.sh).
 on:
   push:
     tags:
@@ -117,9 +129,9 @@ jobs:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_SIGN_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_SIGN_CLIENT_SECRET }}
           # Read by app/electron-builder.cjs
-          CAPTAINSTEMS_SIGN_ENDPOINT: ${{ secrets.AZURE_SIGN_ENDPOINT }}
-          CAPTAINSTEMS_SIGN_ACCOUNT: ${{ secrets.AZURE_SIGN_ACCOUNT }}
-          CAPTAINSTEMS_SIGN_PROFILE: ${{ secrets.AZURE_SIGN_PROFILE }}
+          STEMLAB_SIGN_ENDPOINT: ${{ secrets.AZURE_SIGN_ENDPOINT }}
+          STEMLAB_SIGN_ACCOUNT: ${{ secrets.AZURE_SIGN_ACCOUNT }}
+          STEMLAB_SIGN_PROFILE: ${{ secrets.AZURE_SIGN_PROFILE }}
 
       - name: Verify the installer's signature
         if: runner.os == 'Windows' && steps.signing.outputs.signed == 'true'
@@ -136,7 +148,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: CaptainStems-${{ matrix.name }}
+          name: Stemlab-${{ matrix.name }}
           path: |
             app/release/*.exe
             app/release/*.AppImage
@@ -162,17 +174,15 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           R2_PUBLIC_HOST: ${{ secrets.R2_PUBLIC_HOST }}
         run: |
-          # Same three-state gate as signing: none skips, partial fails, all five publish.
+          # A tag build is a release, and a release ships its update feed: unlike
+          # signing, missing R2 secrets fail here rather than skip, so a merged
+          # release PR cannot quietly leave installed apps without an update.
           present=0
           for value in "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" "$R2_ACCOUNT_ID" "$R2_BUCKET" "$R2_PUBLIC_HOST"; do
             [ -n "$value" ] && present=$((present + 1))
           done
-          if [ "$present" -eq 0 ]; then
-            echo "No R2 secrets - the release has the installers, but installed apps will find no update feed."
-            exit 0
-          fi
           if [ "$present" -ne 5 ]; then
-            echo "::error::Publishing the update feed needs all five R2_* secrets - $((5 - present)) of them are unset."
+            echo "::error::Publishing the update feed needs all five R2_* secrets - $((5 - present)) of them are unset. Set them with: gh secret set R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET R2_PUBLIC_HOST"
             exit 1
           fi
           endpoint="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
@@ -181,16 +191,16 @@ jobs:
           # an installed app may already be downloading.
           for file in *.exe *.AppImage *.dmg *.zip *.blockmap; do
             [ -e "$file" ] || continue
-            aws s3api put-object --bucket "$R2_BUCKET" --key "captainstems/$file" --body "$file"               --if-none-match '*' --content-type application/octet-stream --endpoint-url "$endpoint"
+            aws s3api put-object --bucket "$R2_BUCKET" --key "stemlab/$file" --body "$file"               --if-none-match '*' --content-type application/octet-stream --endpoint-url "$endpoint"
           done
           # latest*.yml is the pointer the apps poll, and the one file that is overwritten
           for file in latest*.yml; do
             [ -e "$file" ] || continue
-            aws s3api put-object --bucket "$R2_BUCKET" --key "captainstems/$file" --body "$file"               --content-type text/yaml --cache-control "max-age=300" --endpoint-url "$endpoint"
+            aws s3api put-object --bucket "$R2_BUCKET" --key "stemlab/$file" --body "$file"               --content-type text/yaml --cache-control "max-age=300" --endpoint-url "$endpoint"
           done
           for file in latest*.yml; do
             [ -e "$file" ] || continue
-            url="https://$R2_PUBLIC_HOST/captainstems/$file"
+            url="https://$R2_PUBLIC_HOST/stemlab/$file"
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-redirs 0 "$url")
             if [ "$code" != "200" ]; then
               echo "::error::$url answered $code, not 200 - is the custom domain attached to the bucket?"
@@ -210,8 +220,71 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
-      - uses: softprops/action-gh-release@v2
+      - name: Attach the installers to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # tag-release.yml drafted the release with the curated notes; a hand-pushed tag has none yet
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --title "$TAG" --generate-notes
+          fi
+          gh release upload "$TAG" artifacts/* --repo "$GITHUB_REPOSITORY" --clobber
+
+  # The Store takes a signed installer and a stable version, nothing else.
+  # Both are decided here from the artefact itself rather than from flags the
+  # matrix legs would have to agree on: secrets are not readable from `if:`,
+  # and a job output written by three legs is whichever leg finished last.
+  store-gate:
+    needs: build
+    runs-on: windows-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    outputs:
+      submit: ${{ steps.check.outputs.submit }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v4
         with:
-          files: artifacts/*
-          draft: true
-          generate_release_notes: true
+          name: Stemlab-Windows
+          path: windows
+      - name: Decide whether this version goes to the Store
+        id: check
+        shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          $version = $env:TAG -replace '^v', ''
+          "version=$version" >> $env:GITHUB_OUTPUT
+          # A v1.2.3-rc1 tag builds and publishes like any other, but a release
+          # candidate is not something to put in front of everyone who has the
+          # app from the Store.
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            Write-Host "$version is not a stable X.Y.Z version - not submitting it to the Store."
+            "submit=false" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+          $installer = Get-Item windows/Stemlab-Setup-*.exe
+          $signature = Get-AuthenticodeSignature $installer.FullName
+          if ($signature.Status -ne 'Valid') {
+            Write-Host "::warning::The installer is unsigned ($($signature.Status)). The Store rejects unsigned packages, so $version is not submitted. Set the six AZURE_SIGN_* secrets and release a new version."
+            "submit=false" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+          Write-Host "Signed by $($signature.SignerCertificate.Subject) - submitting $version"
+          "submit=true" >> $env:GITHUB_OUTPUT
+
+  store:
+    needs: store-gate
+    if: needs.store-gate.outputs.submit == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/store-submit.yml
+    with:
+      version: ${{ needs.store-gate.outputs.version }}
+    secrets:
+      STORE_TENANT_ID: ${{ secrets.STORE_TENANT_ID }}
+      STORE_CLIENT_ID: ${{ secrets.STORE_CLIENT_ID }}
+      STORE_CLIENT_SECRET: ${{ secrets.STORE_CLIENT_SECRET }}
+      STORE_SELLER_ID: ${{ secrets.STORE_SELLER_ID }}
+      STORE_PRODUCT_ID: ${{ secrets.STORE_PRODUCT_ID }}
+      R2_PUBLIC_HOST: ${{ secrets.R2_PUBLIC_HOST }}

@@ -8,8 +8,8 @@ pytest.importorskip("fastapi", reason="install the server extra: uv sync --inexa
 
 from fastapi.testclient import TestClient
 
-from captainstems.server.app import create_app
-from captainstems.server.jobs import JobManager
+from stemlab.server.app import create_app
+from stemlab.server.jobs import JobManager
 
 RECIPE = {
     "name": "api",
@@ -389,8 +389,8 @@ def test_old_uploads_are_cleaned_up(home):
     import os
     import time
 
-    from captainstems import paths
-    from captainstems.server.app import clean_uploads
+    from stemlab import paths
+    from stemlab.server.app import clean_uploads
 
     old = paths.uploads_dir() / "old"
     fresh = paths.uploads_dir() / "fresh"
