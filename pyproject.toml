@@ -1,6 +1,6 @@
 [project]
 name = "stemlab"
-version = "1.0.0.dev0"
+version = "1.0.0"
 description = "Power-user stem separation workbench: recipe engine, CLI, local API and UI"
 readme = "README.md"
 requires-python = ">=3.11"
