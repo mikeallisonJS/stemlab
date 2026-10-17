@@ -36,3 +36,18 @@ def test_home_override_never_migrates(tmp_path: Path, monkeypatch):
 
     assert paths.home() == tmp_path / "elsewhere"
     assert (tmp_path / ".captainstems").exists()
+
+
+def test_home_says_so_when_the_legacy_folder_cannot_move(tmp_path: Path, monkeypatch, capsys):
+    monkeypatch.delenv("STEMLAB_HOME", raising=False)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    (tmp_path / ".captainstems" / "models").mkdir(parents=True)
+
+    def refuse(self, target):
+        raise OSError("cross-device link")
+
+    monkeypatch.setattr(Path, "rename", refuse)
+
+    assert paths.home() == tmp_path / ".stemlab"
+    assert (tmp_path / ".captainstems" / "models").exists()
+    assert "could not move" in capsys.readouterr().err

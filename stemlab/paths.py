@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 # The repository, where the recipes, the MSST submodule and the built UI live.
@@ -34,8 +35,14 @@ def _adopt_legacy_home(root: Path) -> None:
         return
     try:
         legacy.rename(root)
-    except OSError:
-        pass  # another drive or no permission: start fresh, the old folder stays
+    except OSError as error:
+        # Another drive or no permission: start fresh, the old folder stays. Said once, since
+        # the new folder exists from here on and the rename is never tried again.
+        print(
+            f"stemlab: could not move {legacy} to {root} ({error}); starting with an empty "
+            f"{root}. Move the models across yourself to keep them.",
+            file=sys.stderr,
+        )
 
 
 def models_dir() -> Path:

@@ -281,4 +281,10 @@ jobs:
     uses: ./.github/workflows/store-submit.yml
     with:
       version: ${{ needs.store-gate.outputs.version }}
-    secrets: inherit
+    secrets:
+      STORE_TENANT_ID: ${{ secrets.STORE_TENANT_ID }}
+      STORE_CLIENT_ID: ${{ secrets.STORE_CLIENT_ID }}
+      STORE_CLIENT_SECRET: ${{ secrets.STORE_CLIENT_SECRET }}
+      STORE_SELLER_ID: ${{ secrets.STORE_SELLER_ID }}
+      STORE_PRODUCT_ID: ${{ secrets.STORE_PRODUCT_ID }}
+      R2_PUBLIC_HOST: ${{ secrets.R2_PUBLIC_HOST }}

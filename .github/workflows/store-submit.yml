@@ -38,6 +38,21 @@ on:
         description: Fail instead of skipping when the STORE_* secrets are unset
         default: false
         type: boolean
+    # Named rather than inherited, so the signing and R2 write credentials never reach this job.
+    # Not required: unset ones arrive empty and the secret gate below decides.
+    secrets:
+      STORE_TENANT_ID:
+        required: false
+      STORE_CLIENT_ID:
+        required: false
+      STORE_CLIENT_SECRET:
+        required: false
+      STORE_SELLER_ID:
+        required: false
+      STORE_PRODUCT_ID:
+        required: false
+      R2_PUBLIC_HOST:
+        required: false
   workflow_dispatch:
     inputs:
       version:
@@ -65,6 +80,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Only reads the repository; no GITHUB_TOKEN on disk beside the Store credentials
+          persist-credentials: false
 
       - name: Submit to the Microsoft Store
         env:

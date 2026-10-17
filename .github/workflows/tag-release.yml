@@ -18,7 +18,8 @@ permissions:
 
 jobs:
   tag:
-    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/')
+    # Only release-pr.yml's PR: `release/next` in this repository, not a fork's branch of that name
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'release/next' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,8 +35,14 @@ jobs:
       - name: Push tag
         env:
           V: ${{ steps.version.outputs.version }}
+          SHA: ${{ github.event.pull_request.merge_commit_sha }}
         run: |
-          git tag "v$V" "${{ github.event.pull_request.merge_commit_sha }}"
+          # release.py only ever writes X.Y.Z here; anything else is a hand edit, not a release
+          if ! [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::pyproject.toml has version '$V', not X.Y.Z - not tagging it."
+            exit 1
+          fi
+          git tag "v$V" "$SHA"
           git push origin "v$V"
 
       - name: Draft the release with curated notes

@@ -58,3 +58,4 @@ app/dist/
 app/out/
 app/release/
 .env
+.wrangler/
