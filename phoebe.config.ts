@@ -26,10 +26,10 @@ const config = {
   configDir: ".phoebe",
   installCommand:
     "uv sync --locked --extra dev --extra server && cd app && ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm install --frozen-lockfile",
-  checkCommand: "uv run ruff check . && cd app && pnpm typecheck",
-  testCommand: "uv run pytest && cd app && pnpm test",
+  checkCommand: "uv run ruff check . && (cd app && pnpm typecheck)",
+  testCommand: "uv run pytest && (cd app && pnpm test)",
   readyCommand:
-    "uv run ruff check . && cd app && pnpm typecheck && uv run pytest && cd app && pnpm test",
+    "uv run ruff check . && (cd app && pnpm typecheck) && uv run pytest && (cd app && pnpm test)",
   defaultProvider: "claude",
   providerEnv: { claude: "ANTHROPIC_AUTH_TOKEN" },
 };
