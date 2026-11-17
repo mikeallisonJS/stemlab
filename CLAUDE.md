@@ -16,9 +16,9 @@ Power-user stem separation workbench. Python engine + CLI (`stemlab/`), FastAPI 
 ## Rules
 - Backends implement `stemlab/backends/base.py`; never call a backend from the UI or server directly, always through the runner.
 - All knobs are declared in the backend's `supported_params`; the UI form is generated from the recipe JSON Schema, never hand-built.
-- Model weights never enter git. Registry root is `~/.stemlab/models/`.
+- Model weights never enter git. Registry root is `stemlab.paths.models_dir()`: `$STEMLAB_HOME/models/`, default `~/.stemlab/models/` (the test suite points `STEMLAB_HOME` at a temp dir).
 - Torch is never a declared dependency of the package; the bootstrap installs the right flavor. Tests must pass on CPU.
 - MSST is a pinned submodule at `third_party/msst`; wrap, don't modify.
 - Every run writes `run.json` with resolved params and model sha256s. If a result can't be reproduced from `run.json`, that's a bug.
-- A PR that touches code adds a changelog fragment, `changelog.d/<issue>.<type>.md` or `+<slug>.<type>.md` (README: Releases). Releases are cut by merging the bot's `release/next` PR; never bump versions or push `v*` tags by hand.
+- A PR that touches `stemlab/`, `app/src/`, `app/scripts/`, `app/electron-builder.cjs`, `app/package.json`, `recipes/`, `third_party/` or `pyproject.toml` adds a changelog fragment, `changelog.d/<issue>.<type>.md` or `+<slug>.<type>.md`; CI (`changelog-check`) fails without one (README: Releases). Releases are cut by merging the bot's `release/next` PR; never bump versions or push `v*` tags by hand.
 - Plan and decisions: see the handoff doc (link in README).
