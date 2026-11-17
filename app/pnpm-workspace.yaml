@@ -2,3 +2,5 @@ allowBuilds:
   esbuild: true
   electron: true
   electron-winstaller: false
+overrides:
+  tinypool: 2.1.2
