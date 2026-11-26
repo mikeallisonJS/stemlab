@@ -79,7 +79,7 @@ jobs:
   submit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Only reads the repository; no GITHUB_TOKEN on disk beside the Store credentials
           persist-credentials: false
