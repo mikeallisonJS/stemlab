@@ -5,6 +5,13 @@ and are rendered here by the release PR (see the README under Releases).
 
 <!-- towncrier release notes start -->
 
+## v1.0.1 — 2026-11-26
+
+### Fixes
+
+- Updates Electron to 44.9.1, which fixes a high-severity advisory (GHSA-jr5w-w6x2-84p9), along with patch updates to React, Vite, electron-builder, electron-updater and @xyflow/react. ([#24](https://github.com/mikeallisonJS/Stemlab/issues/24))
+
+
 ## v1.0.0 — 2026-10-17
 
 ### Features
