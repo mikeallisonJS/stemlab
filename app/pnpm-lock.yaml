@@ -17,8 +17,8 @@ importers:
         specifier: ^2.6.2
         version: 2.6.2
       '@types/node':
-        specifier: ^26.6.5
-        version: 26.6.5
+        specifier: ^26.6.6
+        version: 26.6.7
       '@types/react':
         specifier: ^19.0.0
         version: 19.3.0
@@ -27,37 +27,37 @@ importers:
         version: 19.3.0(@types/react@19.3.0)
       '@vitejs/plugin-react':
         specifier: ^5.0.0
-        version: 5.2.0(supports-color@7.2.0)(vite@7.3.7(@types/node@26.6.5)(jiti@2.7.0))
+        version: 5.2.0(supports-color@7.2.0)(vite@7.3.8(@types/node@26.6.7)(jiti@2.7.0))
       '@xyflow/react':
-        specifier: ^12.12.0
-        version: 12.12.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        specifier: ^12.12.1
+        version: 12.12.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       electron:
-        specifier: ^44.7.0
-        version: 44.7.0(supports-color@7.2.0)
+        specifier: ^44.9.1
+        version: 44.11.6(supports-color@7.2.0)
       electron-builder:
-        specifier: ^26.15.3
-        version: 26.15.3(electron-builder-squirrel-windows@26.15.3)(supports-color@7.2.0)
+        specifier: ^26.18.1
+        version: 26.18.1(electron-builder-squirrel-windows@26.18.1)(supports-color@7.2.0)
       electron-updater:
-        specifier: ^6.8.9
-        version: 6.8.9(supports-color@7.2.0)
+        specifier: ^6.8.12
+        version: 6.8.12(supports-color@7.2.0)
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
       react:
-        specifier: ^19.3.0
-        version: 19.3.0
+        specifier: ^19.3.1
+        version: 19.3.1
       react-dom:
-        specifier: ^19.3.0
-        version: 19.3.0(react@19.3.0)
+        specifier: ^19.3.1
+        version: 19.3.1(react@19.3.1)
       typescript:
         specifier: ^5.6.0
         version: 5.9.3
       vite:
-        specifier: ^7.0.0
-        version: 7.3.7(@types/node@26.6.5)(jiti@2.7.0)
+        specifier: ^7.3.8
+        version: 7.3.8(@types/node@26.6.7)(jiti@2.7.0)
       vitest:
         specifier: ^3.0.0
-        version: 3.2.7(@types/debug@4.1.13)(@types/node@26.6.5)(jiti@2.7.0)(supports-color@7.2.0)
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@26.6.7)(jiti@2.7.0)(supports-color@7.2.0)
       wavesurfer.js:
         specifier: ^7.12.0
         version: 7.12.12
@@ -386,10 +386,6 @@ packages:
     resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
     engines: {node: ^14.21.3 || >=16}
 
-  '@noble/hashes@2.4.0':
-    resolution: {integrity: sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA==}
-    engines: {node: '>= 20.19.0'}
-
   '@peculiar/asn1-schema@2.10.0':
     resolution: {integrity: sha512-GhokD41lV4gQrrLYm3wCkHfBOnJrnhDMgt4XeMW8gzfE1UdJqIuSwsE+ggf82XBjUXRJylcm+KIGQFa4utIVLw==}
     engines: {node: '>=14'}
@@ -694,8 +690,8 @@ packages:
   '@types/node@24.19.2':
     resolution: {integrity: sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==}
 
-  '@types/node@26.6.5':
-    resolution: {integrity: sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg==}
+  '@types/node@26.6.7':
+    resolution: {integrity: sha512-tovuRfrUILu6v46bMG+BgXxMvsqPBx2WO2as8Rpln+JTff1dbexMtAM4KFTejmL0axsnSWViCW7MecUQpLuBRA==}
 
   '@types/react-dom@19.3.0':
     resolution: {integrity: sha512-ZI7bU42mZXXKHn/qNLEw2IrbiINU7X5+vfgdixBHkCNpYWXjKgfQ/P+uyGb5CjOLB9UcnTeg3rylQtV2hym44Q==}
@@ -747,8 +743,8 @@ packages:
     resolution: {integrity: sha512-/5NV/vDALVFDXgLmfsy9TRCBlKwO2LNBFzpzvb9iIj+jR+eSc6DLYYvVOdivT/jm7MtU6TebYuRmzEOI7w40UA==}
     engines: {node: '>=10.0.0'}
 
-  '@xyflow/react@12.12.0':
-    resolution: {integrity: sha512-74oXI0Rgm1Eu33cHQAd74J6oVgCH9mbFyTVQbsGgp2kmWwh0HdtBr2VP04z8mbPD+M/xO69nqG5dDEt7/EN2rQ==}
+  '@xyflow/react@12.12.1':
+    resolution: {integrity: sha512-g41OHmP+GL5wDBQKpgYt8AF6RlB4CrABtiStXhCMqdItK6gPdSpsuDk8V0YtdyvIvMPTjDJvkuLkz0JbSYu5Cw==}
     peerDependencies:
       '@types/react': '>=17'
       '@types/react-dom': '>=17'
@@ -760,8 +756,8 @@ packages:
       '@types/react-dom':
         optional: true
 
-  '@xyflow/system@0.0.83':
-    resolution: {integrity: sha512-a//eDjez3WZF47aaPTfVUDD0OINOq+WVwBZCRTqG+m0a5euX8EwlJ4jMY1Wxz0Ocj4xOeekJ70V22Pq0ll8RJw==}
+  '@xyflow/system@0.0.84':
+    resolution: {integrity: sha512-96zfGFjH3oZ3T0MRdH4gJ0SlXuCIxbBuHVevZ4xry5UTxqjzjt010+LRdholgepq7jhrcaz1JNtzrETscwnkEA==}
 
   abbrev@4.0.0:
     resolution: {integrity: sha512-a1wflyaL0tHtJSmLSOVybYhy22vRih4eduhhrkcjgrWGnRfrZtovJ2FRjxuTtkkj47O/baf0R86QU5OuYpz8fA==}
@@ -782,12 +778,12 @@ packages:
     resolution: {integrity: sha512-zbB9rCJAT1rbjiVDb2hqKFHNYLxgtk8NURxZ3IZwD3F6NtxbXZQCnnSi1Lkx+IDohdPlFp222wVALIheZJQSEg==}
     engines: {node: '>=8'}
 
-  app-builder-lib@26.15.3:
-    resolution: {integrity: sha512-2VnyWkqsP5v5XbBhL3tD5Syx8iNPBYsoU7kY4S2fz7wg8Rj/nztWKCUzGKaFRTv0Xwf3/H058CR1Kvtd/3lRow==}
+  app-builder-lib@26.18.1:
+    resolution: {integrity: sha512-HxHcSQoy8RmiFCSxgKyt5Lrwx8HCURh5834TRaHEjkDkVS2wVt3RnkQDkG0zaQZfhz3d8WQtF8zv914xSm0ZpA==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
-      dmg-builder: 26.15.3
-      electron-builder-squirrel-windows: 26.15.3
+      dmg-builder: 26.18.1
+      electron-builder-squirrel-windows: 26.18.1
 
   argparse@2.0.1:
     resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
@@ -857,12 +853,12 @@ packages:
   buffer-from@1.1.2:
     resolution: {integrity: sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==}
 
-  builder-util-runtime@9.7.0:
-    resolution: {integrity: sha512-g/kR520giAFYkSXTzcmF3kqQq7wi8F6N6SzeDgZrqTBN+VHdmgWOyTdD1yD7AATDId/yXLvuP34CxW46/BwCdw==}
+  builder-util-runtime@9.7.1:
+    resolution: {integrity: sha512-LLAn0Ddqz0YIyysCysBkg18qEdAzMASiADSZl5G8gpxsqu1RJrdFAqoAW9suwg0GHKMqrycISFSD/9RqSm5d6g==}
     engines: {node: '>=12.0.0'}
 
-  builder-util@26.15.3:
-    resolution: {integrity: sha512-q2hn7Mbo2nFNkVekPiHFx6Nfo3hURmES3tfBn+k5Pqxl2RkmP3QGqZUhH/q9Pch/4G05NRhPjDlVj1O8q4Txvw==}
+  builder-util@26.18.1:
+    resolution: {integrity: sha512-t+1Xnzj8jQ2FnJWtQOKVCuzv3QGjvNhE6er757omlKFysQexdrCVI9eM/uu4+39IiMCtM2l/30O1Yrqqbt4HQw==}
     engines: {node: '>=14.0.0'}
 
   bytestreamjs@2.0.1:
@@ -1044,8 +1040,8 @@ packages:
   dir-compare@4.2.0:
     resolution: {integrity: sha512-2xMCmOoMrdQIPHdsTawECdNPwlVFB9zGcz3kuhmBO6U3oU+UQjsue0i8ayLKpgBcm+hcXPMVSGUN9d+pvJ6+VQ==}
 
-  dmg-builder@26.15.3:
-    resolution: {integrity: sha512-O3zJUFUYHJKgzPqioHxfxzBzlSC1eXCSr79gMSBKBP5AgjjpmrydMsMLotEg9fAJF36vdUncb+4ndRNxoPdlSQ==}
+  dmg-builder@26.18.1:
+    resolution: {integrity: sha512-ihBAAhXUQiO+fIQGirYSLuKfgGa81zIrIzgSSkbm1fPcE0cXqnxNLtUQgxYHpezxWOaeXxmh9AuPemONZuMKbg==}
 
   dotenv-expand@11.0.7:
     resolution: {integrity: sha512-zIHwmZPRshsCdpMDyVsqGmgyP0yT8GAgXUnkdAoJisxvf33k7yO6OuoKmcTGuXPWSsm8Oh88nZicRLA9Y0rUeA==}
@@ -1067,29 +1063,29 @@ packages:
     engines: {node: '>=0.10.0'}
     hasBin: true
 
-  electron-builder-squirrel-windows@26.15.3:
-    resolution: {integrity: sha512-Jc19XPV9y9+2bAdZPkXuVNGNIEFBq9poHC61l8Kv6FdK7DRG3+Ic0rerC0DXOaeHNz8yW0fg/JnF8GQROOF5MA==}
+  electron-builder-squirrel-windows@26.18.1:
+    resolution: {integrity: sha512-EZmCBoO1nJbtzTPTPcbQEqo1IGiu2iGID/qeFTQZsJ1ETPPdXHZSxvu9ie0+XhjjQWbK4JxzYyUtRB/qw+lSVQ==}
 
-  electron-builder@26.15.3:
-    resolution: {integrity: sha512-a1KM5heqS3gQCZzizXEI8RjJy3QVogULPdeSknt76uLDpBIW/HDGsMg/XgP0riP6PI9COsRvFITKKGDqA8fJxA==}
+  electron-builder@26.18.1:
+    resolution: {integrity: sha512-uA3To9X/D4ozwP8k/o/MCfKi/xETyPV0FkhTaqdgIT679uexsQ8QFE+PhF8x6PY8W1jIJrw9/yadTuOWTpmAew==}
     engines: {node: '>=14.0.0'}
     hasBin: true
 
-  electron-publish@26.15.3:
-    resolution: {integrity: sha512-g/2bn8YTavY4cuS5F+jOS7zmZbXXBV8KZ8yHKfJjFPoKtzBqrpCdNPxBd3tqdBwP7BVd0lGzf7Bk2s0KesWZ4Q==}
+  electron-publish@26.18.1:
+    resolution: {integrity: sha512-VlAkMx9kgPP/TGn5q5sgCSYwKtMUXBGhXT2XwFi3p3lMJZDgCIWErikWBaI6tJg8PbMeXZ6vK1eR2+DzcZsb5w==}
 
   electron-to-chromium@1.5.452:
     resolution: {integrity: sha512-cVvk1YBSj6571VmV6hdJTqj94Y79xSu8cj6Y9t6ae4Y4431z8/7EJFvu3rVp90xhfuv9BpPKUmaLfTo4+FOGBg==}
 
-  electron-updater@6.8.9:
-    resolution: {integrity: sha512-ZhVxM9iGONUpZGI1FxdMRgJjUFXi7AYGVa5PwKlO1tV1/4zDxQmfKpXOHVztKrd6L9rLcFjERvi1Mf2vxyTkig==}
+  electron-updater@6.8.12:
+    resolution: {integrity: sha512-AK17iWH8zXu5Qqw2f2P0v+Fx4tAF9dWWOYAe2jgURpNz6i2LQc9ZX3hBq4K7iP9qjNnaDzRHKn8455+MEwlrbw==}
 
   electron-winstaller@5.4.0:
     resolution: {integrity: sha512-bO3y10YikuUwUuDUQRM4KfwNkKhnpVO7IPdbsrejwN9/AABJzzTQ4GeHwyzNSrVO+tEH3/Np255a3sVZpZDjvg==}
     engines: {node: '>=8.0.0'}
 
-  electron@44.7.0:
-    resolution: {integrity: sha512-aUq9/zLAAFYc+a9gy6cd0C3Y/N/RmovLCD8TV8LhIzNhuND6HEgsu96jJz9cbAxvckSPv+Trf2PKEjktoZgFkw==}
+  electron@44.11.6:
+    resolution: {integrity: sha512-ntR909wtKzZhmxmJXONDfoEC0rzVm1LPtC8TKhwPgpY9dhaET1eS1If7HseDo6ALbd2jyWxqgJ1QcQ67dhZNfw==}
     engines: {node: '>= 22.12.0'}
     hasBin: true
 
@@ -1588,17 +1584,17 @@ packages:
     resolution: {integrity: sha512-WuyALRjWPDGtt/wzJiadO5AXY+8hZ80hVpe6MyivgraREW751X3SbhRvG3eLKOYN+8VEvqLcf3wdnt44Z4S4SA==}
     engines: {node: '>=10'}
 
-  react-dom@19.3.0:
-    resolution: {integrity: sha512-JDk8dgif51OjFoDE70+OT9ICyYr+69HlmihNwp1+Nsfbna3t5sIiCa9ZJktDmQ4/1b/rn26hIAR2uYXDMr5r0Q==}
+  react-dom@19.3.1:
+    resolution: {integrity: sha512-Y0bARz53lhEC1NMCASs0/j+faB/zqt3R8hpvg1e8+61ZVJ4UL0UdC4cBbXfZMcIuhrfgeILTLe+ZeBCavQPtKQ==}
     peerDependencies:
-      react: ^19.3.0
+      react: ^19.3.1
 
   react-refresh@0.18.0:
     resolution: {integrity: sha512-QgT5//D3jfjJb6Gsjxv0Slpj23ip+HtOpnNgnb2S5zU3CB26G/IDPGoy4RJB42wzFE46DRsstbW6tKHoKbhAxw==}
     engines: {node: '>=0.10.0'}
 
-  react@19.3.0:
-    resolution: {integrity: sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog==}
+  react@19.3.1:
+    resolution: {integrity: sha512-QNhWdt7nrgVWWQG58QuGsAR3jv3Hbe4mb4vz7w2csnHavciZJgda1CPNaldF6eVxv90ud3jUXpKlHL69gO38yw==}
     engines: {node: '>=0.10.0'}
 
   read-binary-file-arch@1.0.6:
@@ -1854,8 +1850,8 @@ packages:
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
     hasBin: true
 
-  vite@7.3.7:
-    resolution: {integrity: sha512-AHEzTORMbi7/7aXp7w7KZ5+DCUdSeLsJz0grY8xHpc9DHdYb0vQu6DqJfm2tOw3gDExNgPgnJTXxM6syYFHaCA==}
+  vite@7.3.8:
+    resolution: {integrity: sha512-3tTi78MAKhVk9h+YZVXMQ8POmneJuE97QUPAWtJghHzhH7BAyiqQOC2KZh1DWOsu/USB2cRXhznPByaabvYXfw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
     peerDependencies:
@@ -2327,8 +2323,6 @@ snapshots:
 
   '@noble/hashes@1.8.0': {}
 
-  '@noble/hashes@2.4.0': {}
-
   '@peculiar/asn1-schema@2.10.0':
     dependencies:
       '@peculiar/utils': 2.0.3
@@ -2510,7 +2504,7 @@ snapshots:
     dependencies:
       '@types/http-cache-semantics': 4.2.0
       '@types/keyv': 3.1.4
-      '@types/node': 26.6.5
+      '@types/node': 26.6.7
       '@types/responselike': 1.0.3
 
   '@types/chai@5.2.3':
@@ -2549,13 +2543,13 @@ snapshots:
 
   '@types/fs-extra@9.0.13':
     dependencies:
-      '@types/node': 26.6.5
+      '@types/node': 26.6.7
 
   '@types/http-cache-semantics@4.2.0': {}
 
   '@types/keyv@3.1.4':
     dependencies:
-      '@types/node': 26.6.5
+      '@types/node': 26.6.7
 
   '@types/ms@2.1.0': {}
 
@@ -2563,7 +2557,7 @@ snapshots:
     dependencies:
       undici-types: 7.24.6
 
-  '@types/node@26.6.5':
+  '@types/node@26.6.7':
     dependencies:
       undici-types: 8.9.0
 
@@ -2577,9 +2571,9 @@ snapshots:
 
   '@types/responselike@1.0.3':
     dependencies:
-      '@types/node': 26.6.5
+      '@types/node': 26.6.7
 
-  '@vitejs/plugin-react@5.2.0(supports-color@7.2.0)(vite@7.3.7(@types/node@26.6.5)(jiti@2.7.0))':
+  '@vitejs/plugin-react@5.2.0(supports-color@7.2.0)(vite@7.3.8(@types/node@26.6.7)(jiti@2.7.0))':
     dependencies:
       '@babel/core': 7.29.7(supports-color@7.2.0)
       '@babel/plugin-transform-react-jsx-self': 7.29.7(@babel/core@7.29.7(supports-color@7.2.0))
@@ -2587,7 +2581,7 @@ snapshots:
       '@rolldown/pluginutils': 1.0.0-rc.3
       '@types/babel__core': 7.20.5
       react-refresh: 0.18.0
-      vite: 7.3.7(@types/node@26.6.5)(jiti@2.7.0)
+      vite: 7.3.8(@types/node@26.6.7)(jiti@2.7.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -2599,13 +2593,13 @@ snapshots:
       chai: 5.3.3
       tinyrainbow: 2.0.0
 
-  '@vitest/mocker@3.2.7(vite@7.3.7(@types/node@26.6.5)(jiti@2.7.0))':
+  '@vitest/mocker@3.2.7(vite@7.3.8(@types/node@26.6.7)(jiti@2.7.0))':
     dependencies:
       '@vitest/spy': 3.2.7
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 7.3.7(@types/node@26.6.5)(jiti@2.7.0)
+      vite: 7.3.8(@types/node@26.6.7)(jiti@2.7.0)
 
   '@vitest/pretty-format@3.2.7':
     dependencies:
@@ -2635,20 +2629,20 @@ snapshots:
 
   '@xmldom/xmldom@0.8.15': {}
 
-  '@xyflow/react@12.12.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@xyflow/react@12.12.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
-      '@xyflow/system': 0.0.83
+      '@xyflow/system': 0.0.84
       classcat: 5.0.5
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
-      zustand: 4.5.7(@types/react@19.3.0)(react@19.3.0)
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
+      zustand: 4.5.7(@types/react@19.3.0)(react@19.3.1)
     optionalDependencies:
       '@types/react': 19.3.0
       '@types/react-dom': 19.3.0(@types/react@19.3.0)
     transitivePeerDependencies:
       - immer
 
-  '@xyflow/system@0.0.83':
+  '@xyflow/system@0.0.84':
     dependencies:
       '@types/d3-drag': 3.0.7
       '@types/d3-interpolate': 3.0.4
@@ -2677,7 +2671,7 @@ snapshots:
     dependencies:
       color-convert: 2.0.1
 
-  app-builder-lib@26.15.3(dmg-builder@26.15.3)(electron-builder-squirrel-windows@26.15.3)(supports-color@7.2.0):
+  app-builder-lib@26.18.1(dmg-builder@26.18.1)(electron-builder-squirrel-windows@26.18.1)(supports-color@7.2.0):
     dependencies:
       '@electron/asar': 3.4.1
       '@electron/fuses': 1.8.0
@@ -2687,23 +2681,23 @@ snapshots:
       '@electron/rebuild': 4.2.1(supports-color@7.2.0)
       '@electron/universal': 2.0.3(supports-color@7.2.0)
       '@malept/flatpak-bundler': 0.4.0(supports-color@7.2.0)
-      '@noble/hashes': 2.4.0
+      '@noble/hashes': 1.8.0
       '@peculiar/webcrypto': 1.7.1
       '@types/fs-extra': 9.0.13
       ajv: 8.20.0
       asn1js: 3.0.10
       async-exit-hook: 2.0.1
-      builder-util: 26.15.3(supports-color@7.2.0)
-      builder-util-runtime: 9.7.0(supports-color@7.2.0)
+      builder-util: 26.18.1(supports-color@7.2.0)
+      builder-util-runtime: 9.7.1(supports-color@7.2.0)
       chromium-pickle-js: 0.2.0
       ci-info: 4.3.1
       debug: 4.4.3(supports-color@7.2.0)
-      dmg-builder: 26.15.3(electron-builder-squirrel-windows@26.15.3)(supports-color@7.2.0)
+      dmg-builder: 26.18.1(electron-builder-squirrel-windows@26.18.1)(supports-color@7.2.0)
       dotenv: 16.6.1
       dotenv-expand: 11.0.7
       ejs: 3.1.10
-      electron-builder-squirrel-windows: 26.15.3(dmg-builder@26.15.3)(supports-color@7.2.0)
-      electron-publish: 26.15.3(supports-color@7.2.0)
+      electron-builder-squirrel-windows: 26.18.1(dmg-builder@26.18.1)(supports-color@7.2.0)
+      electron-publish: 26.18.1(supports-color@7.2.0)
       fs-extra: 10.1.0
       hosted-git-info: 4.1.0
       isbinaryfile: 5.0.7
@@ -2781,17 +2775,17 @@ snapshots:
 
   buffer-from@1.1.2: {}
 
-  builder-util-runtime@9.7.0(supports-color@7.2.0):
+  builder-util-runtime@9.7.1(supports-color@7.2.0):
     dependencies:
       debug: 4.4.3(supports-color@7.2.0)
       sax: 1.6.1
     transitivePeerDependencies:
       - supports-color
 
-  builder-util@26.15.3(supports-color@7.2.0):
+  builder-util@26.18.1(supports-color@7.2.0):
     dependencies:
       '@types/debug': 4.1.13
-      builder-util-runtime: 9.7.0(supports-color@7.2.0)
+      builder-util-runtime: 9.7.1(supports-color@7.2.0)
       chalk: 4.1.2
       cross-spawn: 7.0.6
       debug: 4.4.3(supports-color@7.2.0)
@@ -2973,10 +2967,10 @@ snapshots:
       minimatch: 3.1.5
       p-limit: 3.1.0
 
-  dmg-builder@26.15.3(electron-builder-squirrel-windows@26.15.3)(supports-color@7.2.0):
+  dmg-builder@26.18.1(electron-builder-squirrel-windows@26.18.1)(supports-color@7.2.0):
     dependencies:
-      app-builder-lib: 26.15.3(dmg-builder@26.15.3)(electron-builder-squirrel-windows@26.15.3)(supports-color@7.2.0)
-      builder-util: 26.15.3(supports-color@7.2.0)
+      app-builder-lib: 26.18.1(dmg-builder@26.18.1)(electron-builder-squirrel-windows@26.18.1)(supports-color@7.2.0)
+      builder-util: 26.18.1(supports-color@7.2.0)
       fs-extra: 10.1.0
       js-yaml: 4.3.2
     transitivePeerDependencies:
@@ -3003,23 +2997,23 @@ snapshots:
     dependencies:
       jake: 10.9.4
 
-  electron-builder-squirrel-windows@26.15.3(dmg-builder@26.15.3)(supports-color@7.2.0):
+  electron-builder-squirrel-windows@26.18.1(dmg-builder@26.18.1)(supports-color@7.2.0):
     dependencies:
-      app-builder-lib: 26.15.3(dmg-builder@26.15.3)(electron-builder-squirrel-windows@26.15.3)(supports-color@7.2.0)
-      builder-util: 26.15.3(supports-color@7.2.0)
+      app-builder-lib: 26.18.1(dmg-builder@26.18.1)(electron-builder-squirrel-windows@26.18.1)(supports-color@7.2.0)
+      builder-util: 26.18.1(supports-color@7.2.0)
       electron-winstaller: 5.4.0(supports-color@7.2.0)
     transitivePeerDependencies:
       - dmg-builder
       - supports-color
 
-  electron-builder@26.15.3(electron-builder-squirrel-windows@26.15.3)(supports-color@7.2.0):
+  electron-builder@26.18.1(electron-builder-squirrel-windows@26.18.1)(supports-color@7.2.0):
     dependencies:
-      app-builder-lib: 26.15.3(dmg-builder@26.15.3)(electron-builder-squirrel-windows@26.15.3)(supports-color@7.2.0)
-      builder-util: 26.15.3(supports-color@7.2.0)
-      builder-util-runtime: 9.7.0(supports-color@7.2.0)
+      app-builder-lib: 26.18.1(dmg-builder@26.18.1)(electron-builder-squirrel-windows@26.18.1)(supports-color@7.2.0)
+      builder-util: 26.18.1(supports-color@7.2.0)
+      builder-util-runtime: 9.7.1(supports-color@7.2.0)
       chalk: 4.1.2
       ci-info: 4.4.0
-      dmg-builder: 26.15.3(electron-builder-squirrel-windows@26.15.3)(supports-color@7.2.0)
+      dmg-builder: 26.18.1(electron-builder-squirrel-windows@26.18.1)(supports-color@7.2.0)
       fs-extra: 10.1.0
       lazy-val: 1.0.5
       simple-update-notifier: 2.0.0
@@ -3028,12 +3022,12 @@ snapshots:
       - electron-builder-squirrel-windows
       - supports-color
 
-  electron-publish@26.15.3(supports-color@7.2.0):
+  electron-publish@26.18.1(supports-color@7.2.0):
     dependencies:
       '@types/fs-extra': 9.0.13
       aws4: 1.13.2
-      builder-util: 26.15.3(supports-color@7.2.0)
-      builder-util-runtime: 9.7.0(supports-color@7.2.0)
+      builder-util: 26.18.1(supports-color@7.2.0)
+      builder-util-runtime: 9.7.1(supports-color@7.2.0)
       chalk: 4.1.2
       form-data: 4.0.6
       fs-extra: 10.1.0
@@ -3044,9 +3038,9 @@ snapshots:
 
   electron-to-chromium@1.5.452: {}
 
-  electron-updater@6.8.9(supports-color@7.2.0):
+  electron-updater@6.8.12(supports-color@7.2.0):
     dependencies:
-      builder-util-runtime: 9.7.0(supports-color@7.2.0)
+      builder-util-runtime: 9.7.1(supports-color@7.2.0)
       fs-extra: 10.1.0
       js-yaml: 4.3.2
       lazy-val: 1.0.5
@@ -3069,7 +3063,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron@44.7.0(supports-color@7.2.0):
+  electron@44.11.6(supports-color@7.2.0):
     dependencies:
       '@electron-internal/extract-zip': 1.0.5
       '@electron/get': 5.1.0(supports-color@7.2.0)
@@ -3256,7 +3250,7 @@ snapshots:
       es6-error: 4.1.1
       matcher: 3.0.0
       roarr: 2.15.4
-      semver: 7.8.5
+      semver: 7.7.4
       serialize-error: 7.0.1
     optional: true
 
@@ -3465,11 +3459,11 @@ snapshots:
 
   node-abi@4.37.0:
     dependencies:
-      semver: 7.8.5
+      semver: 7.7.4
 
   node-api-version@0.2.1:
     dependencies:
-      semver: 7.8.5
+      semver: 7.7.4
 
   node-gyp@12.4.0:
     dependencies:
@@ -3478,7 +3472,7 @@ snapshots:
       graceful-fs: 4.2.11
       nopt: 9.0.0
       proc-log: 6.1.0
-      semver: 7.8.5
+      semver: 7.7.4
       tar: 7.5.22
       tinyglobby: 0.2.17
       undici: 6.29.1
@@ -3577,14 +3571,14 @@ snapshots:
 
   quick-lru@5.1.1: {}
 
-  react-dom@19.3.0(react@19.3.0):
+  react-dom@19.3.1(react@19.3.1):
     dependencies:
-      react: 19.3.0
+      react: 19.3.1
       scheduler: 0.28.0
 
   react-refresh@0.18.0: {}
 
-  react@19.3.0: {}
+  react@19.3.1: {}
 
   read-binary-file-arch@1.0.6(supports-color@7.2.0):
     dependencies:
@@ -3833,21 +3827,21 @@ snapshots:
       escalade: 3.2.0
       picocolors: 1.1.1
 
-  use-sync-external-store@1.7.0(react@19.3.0):
+  use-sync-external-store@1.7.0(react@19.3.1):
     dependencies:
-      react: 19.3.0
+      react: 19.3.1
 
   utf8-byte-length@1.0.5: {}
 
   util-deprecate@1.0.2: {}
 
-  vite-node@3.2.4(@types/node@26.6.5)(jiti@2.7.0)(supports-color@7.2.0):
+  vite-node@3.2.4(@types/node@26.6.7)(jiti@2.7.0)(supports-color@7.2.0):
     dependencies:
       cac: 6.7.14
       debug: 4.4.3(supports-color@7.2.0)
       es-module-lexer: 1.7.0
       pathe: 2.0.3
-      vite: 7.3.7(@types/node@26.6.5)(jiti@2.7.0)
+      vite: 7.3.8(@types/node@26.6.7)(jiti@2.7.0)
     transitivePeerDependencies:
       - '@types/node'
       - jiti
@@ -3862,7 +3856,7 @@ snapshots:
       - tsx
       - yaml
 
-  vite@7.3.7(@types/node@26.6.5)(jiti@2.7.0):
+  vite@7.3.8(@types/node@26.6.7)(jiti@2.7.0):
     dependencies:
       esbuild: 0.28.2
       fdir: 6.5.0(picomatch@4.0.7)
@@ -3871,15 +3865,15 @@ snapshots:
       rollup: 4.64.5
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@types/node': 26.6.5
+      '@types/node': 26.6.7
       fsevents: 2.3.3
       jiti: 2.7.0
 
-  vitest@3.2.7(@types/debug@4.1.13)(@types/node@26.6.5)(jiti@2.7.0)(supports-color@7.2.0):
+  vitest@3.2.7(@types/debug@4.1.13)(@types/node@26.6.7)(jiti@2.7.0)(supports-color@7.2.0):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/expect': 3.2.7
-      '@vitest/mocker': 3.2.7(vite@7.3.7(@types/node@26.6.5)(jiti@2.7.0))
+      '@vitest/mocker': 3.2.7(vite@7.3.8(@types/node@26.6.7)(jiti@2.7.0))
       '@vitest/pretty-format': 3.2.7
       '@vitest/runner': 3.2.7
       '@vitest/snapshot': 3.2.7
@@ -3897,12 +3891,12 @@ snapshots:
       tinyglobby: 0.2.17
       tinypool: 2.1.2
       tinyrainbow: 2.0.0
-      vite: 7.3.7(@types/node@26.6.5)(jiti@2.7.0)
-      vite-node: 3.2.4(@types/node@26.6.5)(jiti@2.7.0)(supports-color@7.2.0)
+      vite: 7.3.8(@types/node@26.6.7)(jiti@2.7.0)
+      vite-node: 3.2.4(@types/node@26.6.7)(jiti@2.7.0)(supports-color@7.2.0)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/debug': 4.1.13
-      '@types/node': 26.6.5
+      '@types/node': 26.6.7
     transitivePeerDependencies:
       - jiti
       - less
@@ -3976,9 +3970,9 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zustand@4.5.7(@types/react@19.3.0)(react@19.3.0):
+  zustand@4.5.7(@types/react@19.3.0)(react@19.3.1):
     dependencies:
-      use-sync-external-store: 1.7.0(react@19.3.0)
+      use-sync-external-store: 1.7.0(react@19.3.1)
     optionalDependencies:
       '@types/react': 19.3.0
-      react: 19.3.0
+      react: 19.3.1
